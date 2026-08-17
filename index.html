@@ -1,11 +1,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Live Mathletics</title>
+<meta name="theme-color" content="#1668c4">
+<!-- Launch fullscreen (no URL bar) when added to the home screen. This is also
+     the real fix for the shifting-viewport problem on mobile browsers. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mathletix">
+<title>Mathletix</title>
 <style>
 /* ============================================================
-   LIVE MATHLETICS — local single-file build
-   Palette follows the older Live Mathletics look: flat solid
-   blue arena, white panels, saturated flat lane colours.
+   MATHLETIX — local single-file build (v2)
+   Flat solid blue arena, white panels, saturated flat lanes.
    ============================================================ */
 :root{
   --blue:#1668c4;
@@ -20,8 +26,11 @@
   --cyan:#22c1dc;
   --purple:#9b59d0;
   --gold:#ffc233;
+  --gold-ink:#e09400;
   --red:#e8443a;
   --radius:14px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
   --font:"Nunito","Quicksand","Avenir Next Rounded","Avenir Next","Trebuchet MS",system-ui,-apple-system,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -33,294 +42,302 @@ body{
   -webkit-font-smoothing:antialiased;
   -webkit-text-size-adjust:100%;
   overflow-x:hidden;
+  overscroll-behavior:none;
+  touch-action:manipulation;
 }
+/* While racing the page must not move under the player's thumb at all. */
+body.racing{position:fixed;inset:0;width:100%;overflow:hidden}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 
-/* ---------- screen router ---------- */
-.screen{display:none;min-height:100dvh;min-height:100vh;flex-direction:column}
+/* ---------- screen router ----------
+   Order matters: vh first as the fallback, dvh second so it wins.
+   Reversing these sizes the page to the *large* viewport, which is
+   what made tap targets drift as the mobile URL bar collapsed. */
+.screen{display:none;min-height:100vh;min-height:100dvh;flex-direction:column}
 .screen.active{display:flex}
 
 /* ============================================================
-   HOME
+   SHARED CHROME
    ============================================================ */
-#screen-home,#screen-levels,#screen-results,#screen-review{
+#screen-home,#screen-levels,#screen-results,#screen-review,#screen-practice{
   background:linear-gradient(180deg,#1e79d8 0%,var(--blue) 45%,var(--blue-dark) 100%);
   align-items:center;
-  padding:26px 18px 40px;
+  padding:calc(22px + var(--safe-t)) 18px calc(40px + var(--safe-b));
 }
 .wrap{width:100%;max-width:880px;margin:0 auto}
 
-.brand{text-align:center;margin:14px 0 22px}
+.brand{text-align:center;margin:10px 0 20px}
 .brand h1{
-  font-size:clamp(38px,8vw,66px);
-  font-weight:800;
-  color:#fff;
-  letter-spacing:-1px;
-  line-height:1;
-  text-shadow:0 4px 0 rgba(0,0,0,.18);
+  font-size:clamp(36px,8vw,62px);font-weight:800;color:#fff;
+  letter-spacing:-1px;line-height:1;text-shadow:0 4px 0 rgba(0,0,0,.18);
 }
 .brand h1 em{font-style:normal;color:var(--gold)}
 .brand p{color:#cfe4ff;font-size:15px;font-weight:600;margin-top:9px}
 
-.card{
-  background:var(--panel);
-  border-radius:20px;
-  padding:22px;
-  box-shadow:0 8px 0 rgba(0,0,0,.14);
-  margin-bottom:16px;
-}
-.card h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-soft);margin-bottom:14px;font-weight:800}
+.card{background:var(--panel);border-radius:20px;padding:20px;
+  box-shadow:0 8px 0 rgba(0,0,0,.14);margin-bottom:15px}
+.card h2{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--ink-soft);margin-bottom:13px;font-weight:800}
 
-.avatar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:10px}
-.avatar-pick{
-  border-radius:16px;padding:6px;background:#eef4fa;border:3px solid transparent;
-  transition:transform .12s,border-color .12s;line-height:0;
-}
+.avatar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:9px;
+  max-height:270px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.avatar-pick{border-radius:14px;padding:5px;background:#eef4fa;border:3px solid transparent;
+  transition:border-color .12s,background .12s;line-height:0}
 .avatar-pick svg{width:100%;height:auto;display:block}
-.avatar-pick[aria-pressed="true"]{border-color:var(--lime);background:#eaf9d8;transform:translateY(-3px)}
+.avatar-pick[aria-pressed="true"]{border-color:var(--lime);background:#eaf9d8}
 
-.field{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+.field{display:flex;flex-direction:column;gap:7px;margin-top:15px}
 .field label{font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
-.field input{
-  font-family:inherit;font-size:19px;font-weight:700;color:var(--ink);
-  padding:13px 15px;border:2px solid #d6e2ee;border-radius:12px;background:#f7fafd;width:100%;
-}
+.field input{font-family:inherit;font-size:19px;font-weight:700;color:var(--ink);
+  padding:13px 15px;border:2px solid #d6e2ee;border-radius:12px;background:#f7fafd;width:100%}
 .field input:focus{outline:none;border-color:var(--blue);background:#fff}
 
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;
   background:var(--lime);color:#1d3d04;font-weight:800;font-size:19px;
-  padding:16px 30px;border-radius:14px;box-shadow:0 5px 0 var(--lime-dark);
-  transition:transform .08s,box-shadow .08s;width:100%;
-}
+  padding:16px 28px;border-radius:14px;box-shadow:0 5px 0 var(--lime-dark);
+  transition:transform .07s,box-shadow .07s;width:100%;margin-bottom:10px}
 .btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--lime-dark)}
 .btn.secondary{background:#e8eff6;color:var(--ink);box-shadow:0 5px 0 #c2d2e0}
 .btn.secondary:active{box-shadow:0 1px 0 #c2d2e0}
-.btn.ghost{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:2px solid rgba(255,255,255,.35)}
+.btn.ghost{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:2px solid rgba(255,255,255,.32)}
 .btn.ghost:active{transform:translateY(2px)}
+.btn.danger{background:#f7dedc;color:#9c2b22;box-shadow:0 5px 0 #e0b5b1}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.btn-row{display:flex;gap:10px}
+.btn-row .btn{margin-bottom:0}
+.toggle-row{display:flex;gap:10px;margin-top:6px}
+.toggle-row .btn{font-size:14px;padding:12px 12px;margin-bottom:0}
 
-.toggle-row{display:flex;gap:10px;margin-top:16px}
-.toggle-row .btn{font-size:14px;padding:12px 14px}
+.topbar{display:flex;align-items:center;gap:12px;width:100%;max-width:880px;margin-bottom:15px}
+.topbar h2{color:#fff;font-size:22px;font-weight:800;flex:1}
+.icon-btn{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.16);
+  border:2px solid rgba(255,255,255,.3);color:#fff;font-size:19px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex:none}
+.hint-note{color:#cfe4ff;font-size:12.5px;font-weight:600;text-align:center;
+  margin-top:13px;line-height:1.6}
 
 /* ============================================================
    LEVEL SELECT
    ============================================================ */
-.topbar{display:flex;align-items:center;gap:12px;width:100%;max-width:880px;margin-bottom:16px}
-.topbar h2{color:#fff;font-size:23px;font-weight:800;flex:1}
-.icon-btn{
-  width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.16);
-  border:2px solid rgba(255,255,255,.3);color:#fff;font-size:19px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;flex:none;
-}
-.level-list{display:grid;gap:12px;width:100%}
-.level-card{
-  display:flex;align-items:center;gap:15px;text-align:left;width:100%;
-  background:var(--panel);border-radius:16px;padding:15px 17px;
-  box-shadow:0 5px 0 rgba(0,0,0,.14);transition:transform .1s,box-shadow .1s;
-}
+.level-list{display:grid;gap:11px;width:100%}
+.level-card{display:flex;align-items:center;gap:14px;text-align:left;width:100%;
+  background:var(--panel);border-radius:16px;padding:14px 16px;
+  box-shadow:0 5px 0 rgba(0,0,0,.14);transition:transform .1s,box-shadow .1s}
 .level-card:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.14)}
-.level-num{
-  width:52px;height:52px;flex:none;border-radius:14px;background:var(--blue);color:#fff;
-  display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:800;
-}
+.level-num{width:50px;height:50px;flex:none;border-radius:14px;background:var(--blue);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800}
 .level-card.challenge .level-num{background:var(--gold);color:#5a3d00}
 .level-body{flex:1;min-width:0}
-.level-body strong{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:800;margin-bottom:3px}
+.level-body strong{display:flex;align-items:center;gap:7px;font-size:16.5px;font-weight:800;margin-bottom:3px}
 .level-body span{display:block;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.4}
-.level-meta{flex:none;text-align:right;font-size:12px;font-weight:800;color:var(--ink-soft)}
-.level-meta b{display:block;font-size:21px;color:var(--blue);line-height:1.1}
-/* Deeper amber than --gold: the star sits on the white card, where
-   the bright gold used on the blue arena washes out. */
-.star{color:#e09400;font-size:18px;flex:none}
-.hint-note{
-  color:#cfe4ff;font-size:12.5px;font-weight:600;text-align:center;
-  margin-top:14px;line-height:1.6;max-width:520px;
-}
+.level-meta{flex:none;text-align:right;font-size:11px;font-weight:800;color:var(--ink-soft)}
+.level-meta b{display:block;font-size:20px;color:var(--blue);line-height:1.1}
+.star{color:var(--gold-ink);font-size:17px;flex:none}
+
+/* ============================================================
+   PRACTICE SETUP
+   ============================================================ */
+.seg{display:flex;gap:7px;flex-wrap:wrap}
+.seg button{flex:1;min-width:62px;background:#eef4fa;border-radius:11px;padding:11px 8px;
+  font-weight:800;font-size:14px;color:var(--ink-soft);border:2px solid transparent}
+.seg button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue-deep)}
+.grp{border:2px solid #e3ecf5;border-radius:13px;margin-bottom:9px;overflow:hidden}
+.grp-head{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;background:#f7fafd}
+.grp-head .gname{flex:1;text-align:left;font-weight:800;font-size:15.5px}
+.grp-head .gcount{font-size:12px;font-weight:800;color:var(--ink-soft)}
+.chev{font-size:13px;color:var(--ink-soft);transition:transform .15s}
+.grp.open .chev{transform:rotate(90deg)}
+.sw{width:46px;height:27px;border-radius:99px;background:#cfdbe6;position:relative;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.sw[data-on="1"]{background:var(--lime)}
+.sw[data-on="1"]::after{transform:translateX(19px)}
+.sw[data-on="half"]{background:var(--gold)}
+.sw[data-on="half"]::after{transform:translateX(9px)}
+.grp-body{display:none;padding:5px 13px 11px;background:#fff}
+.grp.open .grp-body{display:block}
+.sub{display:flex;align-items:center;gap:10px;width:100%;padding:9px 0;border-top:1px solid #eef4fa}
+.sub .sname{flex:1;text-align:left;font-size:13.5px;font-weight:700;color:var(--ink)}
+.sub .sw{width:38px;height:22px}
+.sub .sw::after{width:17px;height:17px;top:2.5px;left:2.5px}
+.sub .sw[data-on="1"]::after{transform:translateX(16px)}
+.fig-tag{font-size:10px;font-weight:800;background:#e6f6fb;color:#0f7f93;border-radius:5px;padding:2px 5px}
 
 /* ============================================================
    RACE — solid blue arena
    ============================================================ */
 #screen-race{background:var(--blue);padding:0}
-.race-inner{
-  width:100%;max-width:1000px;margin:0 auto;padding:14px 16px 18px;
-  display:flex;flex-direction:column;flex:1;gap:14px;
-}
+.race-inner{width:100%;max-width:1000px;margin:0 auto;
+  padding:calc(10px + var(--safe-t)) 16px calc(14px + var(--safe-b));
+  display:flex;flex-direction:column;flex:1;gap:12px}
 
-/* --- top: question + answer box side by side, timer right --- */
-.race-top{
-  background:var(--panel);border-radius:var(--radius);
-  padding:14px 18px;display:flex;align-items:center;gap:16px;
-  box-shadow:0 5px 0 rgba(0,0,0,.16);
-}
-.qline{flex:1;display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:nowrap}
-.question{
-  font-size:clamp(24px,5.2vw,44px);font-weight:800;color:var(--ink);
-  white-space:nowrap;line-height:1.1;
-}
-.answerbox{
-  flex:none;min-width:clamp(110px,22vw,190px);height:clamp(52px,9vw,74px);
+.race-head{display:flex;align-items:center;gap:10px;color:#fff}
+.race-head .lv{font-size:15px;font-weight:800;letter-spacing:.3px;flex:1}
+.race-head .lv .dbl{color:var(--gold)}
+.race-head .streak{font-size:14px;font-weight:800;color:var(--gold)}
+
+.race-top{background:var(--panel);border-radius:var(--radius);padding:13px 16px;
+  display:flex;align-items:center;gap:14px;box-shadow:0 5px 0 rgba(0,0,0,.16)}
+.qline{flex:1;display:flex;align-items:center;gap:14px;min-width:0}
+/* Word-based prompts ("Mean =", "Round 515 to the nearest 100 =") are far
+   longer than "7 + 6 =". Shrink the type by prompt length instead of wrapping,
+   so the strip keeps a fixed height and nothing shifts under the player. */
+.question{font-size:clamp(21px,4.6vw,40px);font-weight:800;color:var(--ink);
+  white-space:nowrap;line-height:1.1;overflow:hidden;text-overflow:ellipsis}
+.question.long{font-size:clamp(16px,3.4vw,30px)}
+.question.xlong{font-size:clamp(13px,2.6vw,23px);white-space:normal;
+  line-height:1.15;max-height:2.3em;text-overflow:clip}
+.answerbox{flex:none;min-width:clamp(104px,21vw,180px);height:clamp(50px,8.5vw,70px);
   border:4px solid var(--blue);border-radius:12px;background:#f4f9ff;
   display:flex;align-items:center;justify-content:center;
-  font-size:clamp(26px,5.4vw,44px);font-weight:800;color:var(--blue-deep);
-  letter-spacing:1px;transition:background .12s,border-color .12s;
-}
-.answerbox.correct{background:#e4f8cd;border-color:var(--lime-dark);color:#3c7a00}
-.answerbox.wrong{background:#ffe4e2;border-color:var(--red);color:#b32b22;animation:shake .3s}
-.answerbox .caret{
-  display:inline-block;width:3px;height:.75em;background:var(--blue);
-  margin-left:2px;animation:blink 1s steps(2,start) infinite;vertical-align:-2px;
-}
+  font-size:clamp(24px,5vw,40px);font-weight:800;color:var(--blue-deep);letter-spacing:1px}
+/* One-shot animations, so feedback never lingers over the next question. */
+.answerbox.good{animation:flashGood .34s ease-out}
+.answerbox.bad{animation:flashBad .34s ease-out}
+@keyframes flashGood{0%{border-color:var(--lime-dark);background:#e4f8cd}100%{border-color:var(--blue);background:#f4f9ff}}
+@keyframes flashBad{0%,60%{border-color:var(--red);background:#ffe4e2}100%{border-color:var(--blue);background:#f4f9ff}}
+.answerbox .caret{display:inline-block;width:3px;height:.72em;background:var(--blue);
+  animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
-@keyframes shake{
-  0%,100%{transform:translateX(0)}
-  25%{transform:translateX(-7px)}
-  75%{transform:translateX(7px)}
-}
+/* fixed, not absolute: the race screen pins body to position:fixed, and
+   getBoundingClientRect gives viewport coordinates */
+.float{position:fixed;font-weight:800;font-size:22px;pointer-events:none;
+  animation:floatUp .7s ease-out forwards;z-index:5}
+@keyframes floatUp{to{transform:translateY(-46px);opacity:0}}
 
-/* --- circular timer --- */
-.timer{position:relative;width:66px;height:66px;flex:none}
+.timer{position:relative;width:64px;height:64px;flex:none}
 .timer svg{width:100%;height:100%;transform:rotate(-90deg)}
 .timer .ring-bg{fill:none;stroke:#e3ecf5;stroke-width:9}
-.timer .ring-fg{fill:none;stroke:var(--lime);stroke-width:9;stroke-linecap:round;transition:stroke .3s}
+.timer .ring-fg{fill:none;stroke:var(--lime);stroke-width:9;stroke-linecap:round}
 .timer.warn .ring-fg{stroke:var(--orange)}
 .timer.danger .ring-fg{stroke:var(--red)}
-.timer-num{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:800;color:var(--ink);
-}
+.timer-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;color:var(--ink)}
 .timer.danger .timer-num{color:var(--red)}
 
-/* --- lanes --- */
-.lanes{display:flex;flex-direction:column;gap:9px}
-.lane{display:flex;align-items:center;gap:11px}
-.racer-box{
-  flex:none;width:clamp(112px,22vw,168px);
-  background:var(--panel);border-radius:11px;padding:6px 10px 6px 6px;
-  display:flex;align-items:center;gap:8px;box-shadow:0 3px 0 rgba(0,0,0,.16);
-}
-.racer-box svg{width:34px;height:34px;flex:none;border-radius:50%}
-.racer-box .rname{
-  font-size:13.5px;font-weight:800;color:var(--ink);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
+/* figure slot — reserved for the whole race on levels that can draw,
+   so the layout never shifts mid-question */
+.figure-slot{display:none}
+.figure-slot.reserved{display:flex;align-items:center;justify-content:center;
+  height:126px;background:var(--panel);border-radius:var(--radius);
+  box-shadow:0 5px 0 rgba(0,0,0,.16);padding:6px}
+.figure-slot svg{height:100%;width:auto;max-width:100%}
+.fl{font-family:var(--font);font-size:15px;font-weight:800;fill:var(--ink)}
+
+/* lanes */
+.lanes{display:flex;flex-direction:column;gap:8px}
+.lane{display:flex;align-items:center;gap:10px}
+.racer-box{flex:none;width:clamp(108px,21vw,164px);background:var(--panel);border-radius:11px;
+  padding:5px 9px 5px 5px;display:flex;align-items:center;gap:8px;box-shadow:0 3px 0 rgba(0,0,0,.16)}
+.racer-box svg{width:32px;height:32px;flex:none;border-radius:50%}
+.racer-box .rname{font-size:13px;font-weight:800;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lane.you .racer-box{box-shadow:0 3px 0 var(--lime-dark),0 0 0 3px var(--lime) inset}
-
-.track{position:relative;flex:1;height:34px;min-width:0}
-.track::before{
-  content:"";position:absolute;inset:auto 0 auto 0;top:50%;transform:translateY(-50%);
-  height:12px;border-radius:6px;background:rgba(255,255,255,.14);
-}
-.arrow{
-  position:absolute;left:0;top:50%;transform:translateY(-50%);
-  height:26px;border-radius:5px 0 0 5px;
+.track{position:relative;flex:1;height:32px;min-width:0}
+.track::before{content:"";position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+  height:12px;border-radius:6px;background:rgba(255,255,255,.14)}
+.arrow{position:absolute;left:0;top:50%;transform:translateY(-50%);height:25px;
+  border-radius:5px 0 0 5px;will-change:width;
   clip-path:polygon(0 0,calc(100% - 15px) 0,100% 50%,calc(100% - 15px) 100%,0 100%);
-  transition:width .35s cubic-bezier(.34,1.4,.5,1);
-}
-.lane-score{
-  position:absolute;top:50%;transform:translateY(-50%);
-  margin-left:11px;font-size:18px;font-weight:800;color:#fff;
-  text-shadow:0 2px 3px rgba(0,0,0,.3);transition:left .35s cubic-bezier(.34,1.4,.5,1);
-}
+  transition:width .3s cubic-bezier(.34,1.3,.5,1)}
+.lane-score{position:absolute;top:50%;transform:translateY(-50%);margin-left:11px;
+  font-size:17px;font-weight:800;color:#fff;text-shadow:0 2px 3px rgba(0,0,0,.3);
+  transition:left .3s cubic-bezier(.34,1.3,.5,1)}
+/* personal-best marker */
+.pb{position:absolute;top:2px;bottom:2px;width:0;border-left:3px dashed var(--gold);display:none}
+.pb.on{display:block}
+.pb::after{content:"PB";position:absolute;top:-3px;left:5px;font-size:9px;font-weight:800;color:var(--gold)}
 
-/* --- input area --- */
-.input-area{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
-.keypad{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:9px;
-  width:100%;max-width:430px;
-}
-.keypad button{
-  background:var(--panel);border-radius:13px;font-size:27px;font-weight:800;color:var(--ink);
-  height:60px;box-shadow:0 4px 0 rgba(0,0,0,.22);touch-action:manipulation;
-  display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;
-}
-.keypad button:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.22)}
-.keypad .k-enter{
-  grid-column:4;grid-row:2 / span 3;height:auto;
-  background:var(--lime);color:#1d3d04;box-shadow:0 4px 0 var(--lime-dark);font-size:31px;
-}
-.keypad .k-enter:active{box-shadow:0 1px 0 var(--lime-dark)}
-.keypad .k-back{grid-column:4;grid-row:1;background:#dbe7f2;font-size:23px}
-.keypad .k-zero{grid-column:2 / span 2}
-.keypad.with-dot .k-zero{grid-column:2}
-.keypad .k-dot{display:none}
-.keypad.with-dot .k-dot{display:flex}
+/* input */
+.input-area{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:6px}
+.keypad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;max-width:420px}
+.keypad button{background:var(--panel);border-radius:13px;font-size:26px;font-weight:800;color:var(--ink);
+  height:58px;box-shadow:0 4px 0 rgba(0,0,0,.22);touch-action:manipulation;
+  display:flex;align-items:center;justify-content:center;
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+/* explicit pressed class — preventDefault() on pointerdown suppresses :active
+   on several mobile browsers, which is what made taps feel unregistered */
+.keypad button.pressed{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.22);background:#e8f1fa}
+.keypad .k-enter{grid-column:4;grid-row:2 / span 3;height:auto;
+  background:var(--lime);color:#1d3d04;box-shadow:0 4px 0 var(--lime-dark);font-size:30px}
+.keypad .k-enter.pressed{box-shadow:0 1px 0 var(--lime-dark);background:#8ee02c}
+.keypad .k-back{grid-column:4;grid-row:1;background:#dbe7f2;font-size:22px}
+.k-dot,.k-zero,.k-neg{grid-row:4}
+.k-dot,.k-neg{display:none}
+.k-zero{grid-column:1 / span 3}
+.keypad.with-dot .k-dot{display:flex;grid-column:1}
+.keypad.with-dot .k-zero{grid-column:2 / span 2}
+.keypad.with-neg .k-neg{display:flex;grid-column:3}
+.keypad.with-neg .k-zero{grid-column:1 / span 2}
+.keypad.with-dot.with-neg .k-zero{grid-column:2 / span 1}
 
-.kb-hint{
-  color:#cfe4ff;font-size:14px;font-weight:700;text-align:center;
-  padding:12px;letter-spacing:.3px;
-}
-.kb-hint kbd{
-  background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
-  border-radius:6px;padding:2px 8px;font-family:inherit;font-weight:800;font-size:13px;
-}
-.race-head{display:flex;align-items:center;gap:10px;color:#fff}
-.race-head .lv{font-size:15px;font-weight:800;letter-spacing:.5px;flex:1}
-.race-head .lv .dbl{color:var(--gold)}
+.kb-hint{color:#cfe4ff;font-size:14px;font-weight:700;text-align:center;padding:12px;letter-spacing:.3px}
+.kb-hint kbd{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
+  border-radius:6px;padding:2px 8px;font-family:inherit;font-weight:800;font-size:13px}
 
-/* countdown overlay */
-.countdown{
-  position:fixed;inset:0;background:rgba(11,60,120,.94);
+.countdown{position:fixed;inset:0;background:rgba(11,60,120,.94);
   display:flex;align-items:center;justify-content:center;z-index:50;
-  font-size:clamp(80px,26vw,190px);font-weight:800;color:#fff;
-}
-.countdown span{animation:pop .55s ease-out}
+  font-size:clamp(76px,25vw,180px);font-weight:800;color:#fff}
+.countdown span{animation:pop .5s ease-out}
 @keyframes pop{from{transform:scale(.35);opacity:0}to{transform:scale(1);opacity:1}}
 
 /* ============================================================
    RESULTS / REVIEW
    ============================================================ */
-.standing{
-  display:flex;align-items:center;gap:13px;background:var(--panel);
-  border-radius:14px;padding:12px 15px;box-shadow:0 4px 0 rgba(0,0,0,.14);margin-bottom:10px;
-}
-.standing.you{box-shadow:0 4px 0 var(--lime-dark),0 0 0 3px var(--lime) inset}
-.standing svg{width:42px;height:42px;flex:none;border-radius:50%}
-.place{
-  width:36px;height:36px;flex:none;border-radius:50%;background:#e8eff6;color:var(--ink-soft);
-  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;
-}
-.standing:nth-child(1) .place{background:var(--gold);color:#5a3d00}
-.standing-name{flex:1;font-weight:800;font-size:17px}
-.standing-score{font-weight:800;font-size:25px;color:var(--blue)}
-.result-hero{text-align:center;margin-bottom:18px}
-.result-hero .big{font-size:clamp(46px,13vw,86px);font-weight:800;color:#fff;line-height:1}
+.result-hero{text-align:center;margin-bottom:16px}
+.result-hero .big{font-size:clamp(44px,13vw,82px);font-weight:800;color:#fff;line-height:1}
 .result-hero .sub{color:#cfe4ff;font-weight:700;font-size:16px;margin-top:5px}
-.badge{
-  display:inline-block;background:var(--gold);color:#5a3d00;font-weight:800;
-  padding:7px 16px;border-radius:99px;margin-top:11px;font-size:14px;
-}
-.review-item{
-  background:var(--panel);border-radius:12px;padding:12px 15px;margin-bottom:9px;
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-}
-.review-q{font-weight:800;font-size:17px;flex:1;min-width:130px}
-.review-given{color:var(--red);font-weight:800;font-size:16px;text-decoration:line-through}
-.review-arrow{color:var(--ink-soft);font-weight:800;font-size:15px}
-.review-ans{color:#3c7a00;font-weight:800;font-size:19px}
-.empty-note{color:#cfe4ff;text-align:center;font-weight:700;padding:30px 10px;line-height:1.6}
-.btn-row{display:flex;gap:10px;margin-top:6px}
+.badge{display:inline-block;background:var(--gold);color:#5a3d00;font-weight:800;
+  padding:7px 15px;border-radius:99px;margin:9px 4px 0;font-size:13.5px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:9px;margin-bottom:14px}
+.stat{background:rgba(255,255,255,.13);border:2px solid rgba(255,255,255,.22);
+  border-radius:13px;padding:11px;text-align:center}
+.stat b{display:block;font-size:23px;font-weight:800;color:#fff;line-height:1.2}
+.stat span{font-size:11px;font-weight:800;color:#cfe4ff;text-transform:uppercase;letter-spacing:.6px}
+.standing{display:flex;align-items:center;gap:12px;background:var(--panel);
+  border-radius:14px;padding:11px 14px;box-shadow:0 4px 0 rgba(0,0,0,.14);margin-bottom:9px}
+.standing.you{box-shadow:0 4px 0 var(--lime-dark),0 0 0 3px var(--lime) inset}
+.standing svg{width:40px;height:40px;flex:none;border-radius:50%}
+.place{width:34px;height:34px;flex:none;border-radius:50%;background:#e8eff6;color:var(--ink-soft);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.standing:first-child .place{background:var(--gold);color:#5a3d00}
+.standing-name{flex:1;font-weight:800;font-size:16.5px}
+.standing-score{font-weight:800;font-size:24px;color:var(--blue)}
+.review-item{background:var(--panel);border-radius:12px;padding:11px 14px;margin-bottom:8px;
+  display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.review-q{font-weight:800;font-size:16px;flex:1;min-width:130px}
+.review-given{color:var(--red);font-weight:800;font-size:15px;text-decoration:line-through}
+.review-arrow{color:var(--ink-soft);font-weight:800;font-size:14px}
+.review-ans{color:#3c7a00;font-weight:800;font-size:18px}
+.review-fig{width:100%;display:flex;justify-content:center;padding-top:6px}
+.review-fig svg{height:96px;width:auto}
+.empty-note{color:#cfe4ff;text-align:center;font-weight:700;padding:28px 10px;line-height:1.6}
 
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width:700px){
-  .race-inner{padding:10px 11px 14px;gap:11px}
-  .race-top{padding:11px 12px;gap:10px;flex-wrap:wrap}
-  .qline{gap:10px}
-  .timer{width:54px;height:54px}
-  .timer-num{font-size:18px}
-  .racer-box{width:clamp(96px,34vw,130px);padding:5px 7px 5px 5px}
-  .racer-box svg{width:28px;height:28px}
-  .racer-box .rname{font-size:12px}
-  .track{height:28px}
-  .arrow{height:22px}
-  .lane-score{font-size:15px;margin-left:8px}
+  .race-inner{padding:calc(8px + var(--safe-t)) 10px calc(10px + var(--safe-b));gap:9px}
+  .race-top{padding:10px 11px;gap:9px}
+  .qline{gap:9px}
+  .question{font-size:clamp(18px,5.4vw,26px)}
+  .timer{width:50px;height:50px}
+  .timer-num{font-size:17px}
+  .figure-slot.reserved{height:100px}
+  .fl{font-size:13px}
+  .racer-box{width:clamp(92px,33vw,126px);padding:4px 6px 4px 4px}
+  .racer-box svg{width:26px;height:26px}
+  .racer-box .rname{font-size:11.5px}
+  .track{height:26px}
+  .arrow{height:21px}
+  .lane-score{font-size:14px;margin-left:8px}
   .keypad button{height:54px;font-size:24px}
-  .card{padding:17px}
+  .card{padding:16px}
+  .avatar-grid{max-height:210px}
 }
-@media (max-width:380px){
-  .qline{flex-wrap:wrap;gap:7px}
-  .answerbox{min-width:100px}
+@media (max-height:670px){
+  .keypad button{height:46px;font-size:21px}
+  .figure-slot.reserved{height:86px}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
@@ -331,7 +348,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 <section class="screen active" id="screen-home">
   <div class="wrap">
     <div class="brand">
-      <h1>Live <em>Mathletics</em></h1>
+      <h1>Mathle<em>tix</em></h1>
       <p>60 seconds. Answer as many as you can.</p>
     </div>
     <div class="card">
@@ -342,11 +359,13 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <input id="nameInput" maxlength="12" placeholder="You" autocomplete="off" spellcheck="false">
       </div>
     </div>
-    <button class="btn" id="goLevels">Play &nbsp;▶</button>
+    <button class="btn" id="goLevels">Race &nbsp;▶</button>
+    <button class="btn secondary" id="goPractice">Practice &nbsp;⚙</button>
     <div class="toggle-row">
       <button class="btn ghost" id="modeToggle">Input: Auto</button>
       <button class="btn ghost" id="soundToggle">Sound: On</button>
     </div>
+    <div class="toggle-row"><button class="btn danger" id="resetBtn">Reset all progress</button></div>
   </div>
 </section>
 
@@ -363,12 +382,43 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   </div>
 </section>
 
+<!-- ========================== PRACTICE =========================== -->
+<section class="screen" id="screen-practice">
+  <div class="topbar">
+    <button class="icon-btn" data-go="home">‹</button>
+    <h2>Practice</h2>
+  </div>
+  <div class="wrap">
+    <div class="card">
+      <h2>Topics <span id="topicCount" style="float:right;text-transform:none;letter-spacing:0"></span></h2>
+      <div id="groupList"></div>
+      <div class="btn-row" style="margin-top:11px">
+        <button class="btn secondary" id="selAll" style="font-size:14px;padding:11px">Select all</button>
+        <button class="btn secondary" id="selNone" style="font-size:14px;padding:11px">Clear all</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Timer</h2>
+      <div class="seg" id="segTimer"></div>
+      <h2 style="margin-top:16px">Difficulty</h2>
+      <div class="seg" id="segDiff"></div>
+      <h2 style="margin-top:16px">Stop after</h2>
+      <div class="seg" id="segLimit"></div>
+      <h2 style="margin-top:16px">Opponents</h2>
+      <div class="seg" id="segBots"></div>
+    </div>
+    <button class="btn" id="startPractice">Start practice &nbsp;▶</button>
+    <p class="hint-note" id="practiceNote"></p>
+  </div>
+</section>
+
 <!-- ============================ RACE ============================= -->
 <section class="screen" id="screen-race">
   <div class="race-inner">
     <div class="race-head">
       <button class="icon-btn" id="quitRace">‹</button>
       <div class="lv" id="raceLevelLabel">Level 1</div>
+      <div class="streak" id="streakLabel"></div>
     </div>
     <div class="race-top">
       <div class="qline">
@@ -383,6 +433,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <div class="timer-num" id="timerNum">60</div>
       </div>
     </div>
+    <div class="figure-slot" id="figureSlot"></div>
     <div class="lanes" id="lanes"></div>
     <div class="input-area" id="inputArea"></div>
   </div>
@@ -396,10 +447,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
       <div class="sub" id="finalSub">points</div>
       <div id="finalBadges"></div>
     </div>
+    <div class="statgrid" id="finalStats"></div>
     <div id="standings"></div>
     <button class="btn" id="playAgain">Play again</button>
     <div class="btn-row">
-      <button class="btn secondary" data-go="levels">Change level</button>
+      <button class="btn secondary" id="backToChoice">Change level</button>
       <button class="btn secondary" id="goReview">Review</button>
     </div>
   </div>
@@ -424,272 +476,612 @@ const $ = id => document.getElementById(id);
 const ri = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const round = (n, p = 6) => Math.round(n * 10 ** p) / 10 ** p;
-/** Format a number for display: strips float noise and trailing zeros. */
 const fmt = n => String(round(n, 6));
-/** Pad a number to 2 digits, for clock times. */
 const p2 = n => String(n).padStart(2, "0");
+/** Choose a value from a 5-tier array by difficulty d (1..5). */
+const tier = (d, arr) => arr[Math.min(arr.length - 1, Math.max(0, d - 1))];
+const escapeHTML = s => String(s).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 
 /* ============================================================
-   1. QUESTION GENERATORS
-   Content taken from 3P Learning's official Live Mathletics
-   Levels Guide. Each generator returns {prompt, answer}.
-   Answers in levels 1-5 are always non-negative integers;
-   level 6 is the only level that can produce decimals.
+   1. FIGURES — inline SVG shapes and charts
+   Dimensions are labelled on the figure, so it reads as fast as
+   text rather than slowing the race down.
    ============================================================ */
+const figFrame = inner => `<svg viewBox="0 0 230 126">${inner}</svg>`;
 
-/* ---- shared building blocks ---- */
-const gAdd     = max => { const a = ri(1, max), b = ri(1, max); return { prompt:`${a} + ${b} =`, answer:a + b }; };
-const gSub     = max => { const a = ri(2, max), b = ri(1, a);   return { prompt:`${a} − ${b} =`, answer:a - b }; };
-const gDouble  = max => { const n = ri(1, max);                 return { prompt:`Double ${n} =`, answer:n * 2 }; };
-const gHalf    = max => { const n = ri(1, max);                 return { prompt:`Half of ${n * 2} =`, answer:n }; };
-const gMissAdd = max => { const a = ri(1, max), b = ri(1, max); return { prompt:`${a} + ☐ = ${a + b}`, answer:b }; };
-const gTable   = (tables, upTo) => { const t = pick(tables), n = ri(1, upTo); return { prompt:`${t} × ${n} =`, answer:t * n }; };
-const gDivide  = (tables, upTo) => { const t = pick(tables), n = ri(1, upTo); return { prompt:`${t * n} ÷ ${t} =`, answer:n }; };
-const gMissFac = upTo => { const a = ri(2, upTo), b = ri(2, upTo); return { prompt:`${a} × ☐ = ${a * b}`, answer:b }; };
+function rectSVG(w, h, unit = "cm") {
+  const k = Math.min(130 / w, 66 / h);
+  const pw = Math.max(46, w * k), ph = Math.max(26, h * k);
+  const x = (230 - pw) / 2 - 8, y = (126 - ph) / 2 - 6;
+  return figFrame(`
+    <rect x="${x}" y="${y}" width="${pw}" height="${ph}" fill="#d6ebff" stroke="#1668c4" stroke-width="3" rx="2"/>
+    <text class="fl" x="${x + pw / 2}" y="${y + ph + 21}" text-anchor="middle">${w} ${unit}</text>
+    <text class="fl" x="${x + pw + 9}" y="${y + ph / 2 + 5}">${h} ${unit}</text>`);
+}
+function triSVG(b, h, unit = "cm") {
+  const k = Math.min(126 / b, 60 / h);
+  const pw = Math.max(56, b * k), ph = Math.max(30, h * k);
+  const x = (230 - pw) / 2 - 10, base = 96, apexX = x + pw * 0.4, apexY = base - ph;
+  return figFrame(`
+    <polygon points="${x},${base} ${x + pw},${base} ${apexX},${apexY}" fill="#d6ebff" stroke="#1668c4" stroke-width="3"/>
+    <line x1="${apexX}" y1="${apexY}" x2="${apexX}" y2="${base}" stroke="#e8443a" stroke-width="2" stroke-dasharray="5 4"/>
+    <text class="fl" x="${x + pw / 2}" y="${base + 21}" text-anchor="middle">${b} ${unit}</text>
+    <text class="fl" x="${apexX + 7}" y="${(apexY + base) / 2 + 4}">${h} ${unit}</text>`);
+}
+function cuboidSVG(l, w, h) {
+  // Fixed isometric box — the labels carry the real numbers.
+  const x = 42, y = 40, W = 100, H = 50, dx = 25, dy = -18;
+  return figFrame(`
+    <polygon points="${x},${y} ${x + dx},${y + dy} ${x + W + dx},${y + dy} ${x + W},${y}" fill="#aed6f7" stroke="#1668c4" stroke-width="2.5"/>
+    <polygon points="${x + W},${y} ${x + W + dx},${y + dy} ${x + W + dx},${y + H + dy} ${x + W},${y + H}" fill="#8ec4f0" stroke="#1668c4" stroke-width="2.5"/>
+    <rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#d6ebff" stroke="#1668c4" stroke-width="2.5"/>
+    <text class="fl" x="${x + W / 2}" y="${y + H + 21}" text-anchor="middle">${l} cm</text>
+    <text class="fl" x="${x - 7}" y="${y + H / 2 + 5}" text-anchor="end">${h} cm</text>
+    <text class="fl" x="${x + W + dx + 5}" y="${y + dy + 15}">${w} cm</text>`);
+}
+function barChartSVG(vals) {
+  const n = vals.length, max = Math.max(...vals);
+  const bw = Math.min(26, (180 - (n - 1) * 7) / n), gap = 7;
+  const totalW = n * bw + (n - 1) * gap, x0 = (230 - totalW) / 2;
+  const base = 100, maxH = 58;
+  const bars = vals.map((v, i) => {
+    const bh = Math.max(7, v / max * maxH), x = x0 + i * (bw + gap);
+    return `<rect x="${x}" y="${base - bh}" width="${bw}" height="${bh}" fill="#22c1dc" stroke="#0f7f93" stroke-width="1.5" rx="2"/>
+            <text class="fl" x="${x + bw / 2}" y="${base - bh - 6}" text-anchor="middle">${v}</text>`;
+  }).join("");
+  return figFrame(`${bars}<line x1="${x0 - 9}" y1="${base}" x2="${x0 + totalW + 9}" y2="${base}" stroke="#1668c4" stroke-width="2.5"/>`);
+}
 
-/* ---- level 5: conversions ---- */
-function gTimeConv() {
-  const n = ri(2, 12);
-  return pick([
-    () => ({ prompt:`${n} minutes = ☐ seconds`, answer:n * 60 }),
-    () => ({ prompt:`${n} hours = ☐ minutes`,   answer:n * 60 }),
-    () => ({ prompt:`${n * 60} seconds = ☐ minutes`, answer:n }),
-    () => ({ prompt:`${n * 60} minutes = ☐ hours`,   answer:n }),
-    () => ({ prompt:`${n} days = ☐ hours`,      answer:n * 24 }),
-    () => ({ prompt:`${n} weeks = ☐ days`,      answer:n * 7 }),
-  ])();
-}
-function gLengthConv() {
-  const n = ri(2, 12);
-  return pick([
-    () => ({ prompt:`${n} cm = ☐ mm`, answer:n * 10 }),
-    () => ({ prompt:`${n} m = ☐ cm`,  answer:n * 100 }),
-    () => ({ prompt:`${n} km = ☐ m`,  answer:n * 1000 }),
-    () => ({ prompt:`${n * 10} mm = ☐ cm`,  answer:n }),
-    () => ({ prompt:`${n * 100} cm = ☐ m`,  answer:n }),
-    () => ({ prompt:`${n * 1000} m = ☐ km`, answer:n }),
-  ])();
-}
-
-/* ---- level 6 ---- */
-/* Decimal arithmetic is computed in tenths as integers, then divided,
-   so results land on exact values rather than 0.30000000000000004. */
-function gDecimalOps() {
-  const t = ri(0, 2);
-  if (t === 0) { const a = ri(1, 95), b = ri(1, 95);
-    return { prompt:`${fmt(a / 10)} + ${fmt(b / 10)} =`, answer:round((a + b) / 10) }; }
-  if (t === 1) { const a = ri(2, 99), b = ri(1, a - 1);
-    return { prompt:`${fmt(a / 10)} − ${fmt(b / 10)} =`, answer:round((a - b) / 10) }; }
-  const a = ri(2, 50), b = ri(2, 9);
-  return { prompt:`${fmt(a / 10)} × ${b} =`, answer:round(a * b / 10) };
-}
-function gBrackets() {
-  const a = ri(2, 12), b = ri(2, 12), c = ri(2, 9);
-  return pick([
-    () => ({ prompt:`(${a} + ${b}) × ${c} =`, answer:(a + b) * c }),
-    () => ({ prompt:`${c} × (${a} + ${b}) =`, answer:c * (a + b) }),
-    () => ({ prompt:`(${a + b} − ${b}) × ${c} =`, answer:a * c }),
-    () => ({ prompt:`(${a} × ${c}) + ${b} =`, answer:a * c + b }),
-    () => ({ prompt:`${(a + b) * c} ÷ (${a} + ${b}) =`, answer:c }),
-  ])();
-}
-function gPercent() {
-  // Base is a multiple of 20 so every listed percentage yields an integer.
-  const p = pick([5, 10, 20, 25, 50, 75]), base = ri(1, 12) * 20;
-  return { prompt:`${p}% of ${base} =`, answer:base * p / 100 };
-}
-function gMetricConv() {
-  const n = ri(11, 995);
-  return pick([
-    () => ({ prompt:`${n} mm = ☐ cm`, answer:round(n / 10) }),
-    () => ({ prompt:`${n} cm = ☐ m`,  answer:round(n / 100) }),
-    () => ({ prompt:`${fmt(n / 10)} cm = ☐ mm`, answer:n }),
-    () => ({ prompt:`${fmt(n / 100)} m = ☐ cm`, answer:n }),
-  ])();
-}
-function g24Hour() {
-  // Afternoon/evening only, so the answer is always 4 digits with no leading zero.
-  const h = ri(1, 11), m = pick([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]);
-  return { prompt:`${h}:${p2(m)} pm in 24-hour time =`, answer:(h + 12) * 100 + m };
-}
-function gTimetable() {
-  const startH = ri(6, 19), startM = ri(0, 11) * 5, mins = ri(4, 30) * 5;
-  const total = startH * 60 + startM + mins;
-  const endH = Math.floor(total / 60) % 24, endM = total % 60;
-  return {
-    prompt:`${p2(startH)}:${p2(startM)} → ${p2(endH)}:${p2(endM)} = ☐ minutes`,
-    answer:mins,
-  };
-}
+/* ============================================================
+   2. TOPIC REGISTRY
+   One source of truth, consumed by BOTH the level ladder and
+   practice mode. gen(d) takes difficulty 1..5 and scales ranges.
+   ============================================================ */
 const FRACTIONS = [
   ["1/2", .5], ["1/4", .25], ["3/4", .75], ["1/5", .2], ["2/5", .4],
   ["3/5", .6], ["4/5", .8], ["1/10", .1], ["3/10", .3], ["7/10", .7],
   ["9/10", .9], ["1/8", .125], ["1/100", .01], ["1/20", .05],
 ];
-const gFracDec = () => { const [f, d] = pick(FRACTIONS); return { prompt:`${f} as a decimal =`, answer:d }; };
-const gPctDec  = () => { const p = pick([1, 5, 10, 20, 25, 30, 40, 50, 60, 75, 80, 90]);
-                         return { prompt:`${p}% as a decimal =`, answer:round(p / 100) }; };
-function gSeqWhole() {
-  const start = ri(1, 20), step = ri(2, 12);
-  const t = i => start + step * i;
-  return { prompt:`${t(0)}, ${t(1)}, ${t(2)}, ${t(3)}, ☐`, answer:t(4) };
-}
-function gSeqDecimal() {
-  const start = ri(5, 60), step = ri(2, 25);           // in tenths
-  const t = i => round((start + step * i) / 10);
-  return { prompt:`${fmt(t(0))}, ${fmt(t(1))}, ${fmt(t(2))}, ${fmt(t(3))}, ☐`, answer:t(4) };
-}
 
-/* ---- the levels ---- */
+const TOPICS = {
+  /* ---------------- addition ---------------- */
+  "add.simple": { group:"addition", label:"Addition", gen(d) {
+    const m = tier(d, [10, 20, 50, 100, 500]);
+    const a = ri(1, m), b = ri(1, m);
+    return { prompt:`${a} + ${b} =`, answer:a + b };
+  }},
+  "add.three": { group:"addition", label:"Three-number addition", gen(d) {
+    const m = tier(d, [9, 12, 20, 30, 50]);
+    const a = ri(2, m), b = ri(2, m), c = ri(2, m);
+    return { prompt:`${a} + ${b} + ${c} =`, answer:a + b + c };
+  }},
+  "add.missing": { group:"addition", label:"Missing addend", gen(d) {
+    const m = tier(d, [10, 20, 50, 100, 100]);
+    const a = ri(1, m), b = ri(1, m);
+    return { prompt:`${a} + ☐ = ${a + b}`, answer:b };
+  }},
+  "add.bonds": { group:"addition", label:"Number bonds", gen(d) {
+    const t = tier(d, [10, 20, 20, 50, 100]);
+    const a = ri(1, t - 1);
+    return { prompt:`${a} + ☐ = ${t}`, answer:t - a };
+  }},
+
+  /* ---------------- subtraction ---------------- */
+  "sub.simple": { group:"subtraction", label:"Subtraction", gen(d) {
+    const m = tier(d, [10, 20, 50, 100, 200]);
+    const a = ri(2, m), b = ri(1, a);
+    return { prompt:`${a} − ${b} =`, answer:a - b };
+  }},
+  "sub.missing": { group:"subtraction", label:"Missing number in subtraction", gen(d) {
+    const m = tier(d, [10, 20, 50, 100, 200]);
+    const a = ri(3, m), b = ri(1, a - 1);
+    return { prompt:`${a} − ☐ = ${a - b}`, answer:b };
+  }},
+
+  /* ---------------- multiplication ---------------- */
+  "mul.tables": { group:"multiplication", label:"Times tables", gen(d) {
+    const sets = [[2,5,10],[2,5,10],[2,3,4,5,10],[1,2,3,4,5,6,7,8,9,10],[2,3,4,5,6,7,8,9,10,11,12]];
+    const t = pick(tier(d, sets)), n = ri(1, tier(d, [10, 10, 12, 10, 12]));
+    return { prompt:`${t} × ${n} =`, answer:t * n };
+  }},
+  "mul.missing": { group:"multiplication", label:"Missing factor", gen(d) {
+    const m = tier(d, [5, 5, 10, 10, 12]);
+    const a = ri(2, m), b = ri(2, m);
+    return { prompt:`${a} × ☐ = ${a * b}`, answer:b };
+  }},
+  "mul.squares": { group:"multiplication", label:"Squares", gen(d) {
+    const n = ri(2, tier(d, [5, 7, 10, 12, 15]));
+    return { prompt:`${n}² =`, answer:n * n };
+  }},
+  "mul.powers": { group:"multiplication", label:"Cubes & powers of 10", gen(d) {
+    if (Math.random() < .5) {
+      const n = ri(2, tier(d, [3, 4, 5, 6, 8]));
+      return { prompt:`${n}³ =`, answer:n ** 3 };
+    }
+    const n = ri(2, 9), p = pick([100, 1000]);
+    return { prompt:`${n} × ${p} =`, answer:n * p };
+  }},
+
+  /* ---------------- division ---------------- */
+  "div.facts": { group:"division", label:"Division facts", gen(d) {
+    const sets = [[2,5,10],[2,5,10],[2,3,4,5,10],[1,2,3,4,5,6,7,8,9,10],[2,3,4,5,6,7,8,9,10,11,12]];
+    const t = pick(tier(d, sets)), n = ri(1, tier(d, [10, 10, 12, 10, 12]));
+    return { prompt:`${t * n} ÷ ${t} =`, answer:n };
+  }},
+  "div.byten": { group:"division", label:"Divide by 10 & 100", gen(d) {
+    const p = d >= 4 ? pick([10, 100]) : 10;
+    const n = ri(2, 99) * p;
+    return { prompt:`${n} ÷ ${p} =`, answer:n / p };
+  }},
+
+  /* ---------------- doubles & halves ---------------- */
+  "dbl.double": { group:"doubles", label:"Doubles", gen(d) {
+    const n = ri(1, tier(d, [10, 20, 30, 50, 100]));
+    return { prompt:`Double ${n} =`, answer:n * 2 };
+  }},
+  "dbl.half": { group:"doubles", label:"Halves", gen(d) {
+    const n = ri(1, tier(d, [10, 15, 25, 50, 100]));
+    return { prompt:`Half of ${n * 2} =`, answer:n };
+  }},
+
+  /* ---------------- fractions, decimals, percentages ---------------- */
+  "fdp.decimalops": { group:"fdp", label:"Decimal operations", decimal:true, gen(d) {
+    // Computed in tenths as integers so results are exact (0.1+0.2 === 0.3).
+    const m = tier(d, [30, 50, 80, 95, 150]);
+    const t = ri(0, 2);
+    if (t === 0) { const a = ri(1, m), b = ri(1, m);
+      return { prompt:`${fmt(a / 10)} + ${fmt(b / 10)} =`, answer:round((a + b) / 10) }; }
+    if (t === 1) { const a = ri(2, m), b = ri(1, a - 1);
+      return { prompt:`${fmt(a / 10)} − ${fmt(b / 10)} =`, answer:round((a - b) / 10) }; }
+    const a = ri(2, 50), b = ri(2, 9);
+    return { prompt:`${fmt(a / 10)} × ${b} =`, answer:round(a * b / 10) };
+  }},
+  "fdp.fracdec": { group:"fdp", label:"Fractions to decimals", decimal:true, gen() {
+    const [f, v] = pick(FRACTIONS);
+    return { prompt:`${f} as a decimal =`, answer:v };
+  }},
+  "fdp.pctdec": { group:"fdp", label:"Percentages to decimals", decimal:true, gen() {
+    const p = pick([1, 5, 10, 20, 25, 30, 40, 50, 60, 75, 80, 90]);
+    return { prompt:`${p}% as a decimal =`, answer:round(p / 100) };
+  }},
+  "fdp.pctof": { group:"fdp", label:"Percentage of an amount", gen(d) {
+    // base is a multiple of 20 and p a multiple of 5, so the answer is a whole number.
+    const p = pick(tier(d, [[50],[10,50],[10,25,50],[5,10,20,25,50,75],[5,10,15,20,25,30,40,50,60,75,80]]));
+    const base = ri(1, 12) * 20;
+    return { prompt:`${p}% of ${base} =`, answer:round(base * p / 100) };
+  }},
+  "fdp.fracof": { group:"fdp", label:"Fraction of an amount", gen(d) {
+    const [f, den, num] = pick([["1/2",2,1],["1/3",3,1],["1/4",4,1],["1/5",5,1],
+                                ["2/3",3,2],["3/4",4,3],["2/5",5,2],["3/5",5,3]]);
+    const base = den * ri(2, tier(d, [5, 8, 10, 15, 20]));
+    return { prompt:`${f} of ${base} =`, answer:base / den * num };
+  }},
+  "fdp.equivfrac": { group:"fdp", label:"Equivalent fractions", gen(d) {
+    const n = ri(1, 5), den = ri(n + 1, 9), k = ri(2, tier(d, [3, 3, 4, 5, 6]));
+    return { prompt:`${n}/${den} = ☐/${den * k}`, answer:n * k };
+  }},
+  "fdp.pctchange": { group:"fdp", label:"Percentage increase & decrease", gen() {
+    const p = pick([10, 20, 25, 50]), base = ri(1, 12) * 20;
+    return Math.random() < .5
+      ? { prompt:`Increase ${base} by ${p}% =`, answer:round(base * (100 + p) / 100) }
+      : { prompt:`Decrease ${base} by ${p}% =`, answer:round(base * (100 - p) / 100) };
+  }},
+  "fdp.reversepct": { group:"fdp", label:"Reverse percentage", gen() {
+    const p = pick([10, 20, 25, 50]), whole = ri(2, 20) * 5;
+    return { prompt:`${p}% of ☐ = ${fmt(whole * p / 100)}`, answer:whole };
+  }},
+
+  /* ---------------- measurement & time ---------------- */
+  "mea.time": { group:"measure", label:"Time conversions", gen() {
+    const n = ri(2, 12);
+    return pick([
+      () => ({ prompt:`${n} minutes = ☐ seconds`, answer:n * 60 }),
+      () => ({ prompt:`${n} hours = ☐ minutes`,   answer:n * 60 }),
+      () => ({ prompt:`${n * 60} seconds = ☐ minutes`, answer:n }),
+      () => ({ prompt:`${n * 60} minutes = ☐ hours`,   answer:n }),
+      () => ({ prompt:`${n} days = ☐ hours`, answer:n * 24 }),
+      () => ({ prompt:`${n} weeks = ☐ days`, answer:n * 7 }),
+    ])();
+  }},
+  "mea.length": { group:"measure", label:"Length conversions", gen() {
+    const n = ri(2, 12);
+    return pick([
+      () => ({ prompt:`${n} cm = ☐ mm`, answer:n * 10 }),
+      () => ({ prompt:`${n} m = ☐ cm`,  answer:n * 100 }),
+      () => ({ prompt:`${n} km = ☐ m`,  answer:n * 1000 }),
+      () => ({ prompt:`${n * 10} mm = ☐ cm`,  answer:n }),
+      () => ({ prompt:`${n * 100} cm = ☐ m`,  answer:n }),
+      () => ({ prompt:`${n * 1000} m = ☐ km`, answer:n }),
+    ])();
+  }},
+  "mea.mass": { group:"measure", label:"Mass & capacity", gen() {
+    const n = ri(2, 12);
+    return pick([
+      () => ({ prompt:`${n} kg = ☐ g`, answer:n * 1000 }),
+      () => ({ prompt:`${n * 1000} g = ☐ kg`, answer:n }),
+      () => ({ prompt:`${n} L = ☐ ml`, answer:n * 1000 }),
+      () => ({ prompt:`${n * 1000} ml = ☐ L`, answer:n }),
+      () => ({ prompt:`${n} tonnes = ☐ kg`, answer:n * 1000 }),
+    ])();
+  }},
+  "mea.metric": { group:"measure", label:"mm, cm & m", decimal:true, gen() {
+    const n = ri(11, 995);
+    return pick([
+      () => ({ prompt:`${n} mm = ☐ cm`, answer:round(n / 10) }),
+      () => ({ prompt:`${n} cm = ☐ m`,  answer:round(n / 100) }),
+      () => ({ prompt:`${fmt(n / 10)} cm = ☐ mm`, answer:n }),
+      () => ({ prompt:`${fmt(n / 100)} m = ☐ cm`, answer:n }),
+    ])();
+  }},
+  "mea.time24": { group:"measure", label:"24-hour time", gen() {
+    // Afternoon only, so the answer is always 4 digits with no leading zero.
+    const h = ri(1, 11), m = pick([0,5,10,15,20,25,30,35,40,45,50,55]);
+    return { prompt:`${h}:${p2(m)} pm → 24h =`, answer:(h + 12) * 100 + m };
+  }},
+  "mea.timetable": { group:"measure", label:"Timetable calculations", gen() {
+    const sh = ri(6, 19), sm = ri(0, 11) * 5, mins = ri(4, 30) * 5;
+    const total = sh * 60 + sm + mins;
+    return { prompt:`${p2(sh)}:${p2(sm)} → ${p2(Math.floor(total / 60) % 24)}:${p2(total % 60)} = ☐ minutes`,
+             answer:mins };
+  }},
+  "mea.perimeter": { group:"measure", label:"Perimeter of rectangles", figure:true, gen(d) {
+    const w = ri(2, tier(d, [8, 9, 11, 14, 18])), h = ri(2, tier(d, [6, 7, 9, 11, 14]));
+    return { prompt:`Perimeter = ☐ cm`, answer:2 * (w + h), figure:rectSVG(w, h) };
+  }},
+  "mea.arearect": { group:"measure", label:"Area of rectangles", figure:true, gen(d) {
+    const w = ri(2, tier(d, [8, 9, 11, 14, 18])), h = ri(2, tier(d, [6, 7, 9, 11, 14]));
+    return { prompt:`Area = ☐ cm²`, answer:w * h, figure:rectSVG(w, h) };
+  }},
+  "mea.areatri": { group:"measure", label:"Area of triangles", figure:true, gen(d) {
+    const b = ri(2, tier(d, [6, 7, 9, 11, 14])) * 2, h = ri(2, tier(d, [6, 7, 9, 11, 14]));
+    return { prompt:`Area = ☐ cm²`, answer:b * h / 2, figure:triSVG(b, h) };
+  }},
+  "mea.volume": { group:"measure", label:"Volume of cuboids", figure:true, gen(d) {
+    const l = ri(2, tier(d, [4, 5, 6, 8, 10])),
+          w = ri(2, tier(d, [3, 4, 5, 6, 8])),
+          h = ri(2, tier(d, [3, 4, 5, 6, 8]));
+    return { prompt:`Volume = ☐ cm³`, answer:l * w * h, figure:cuboidSVG(l, w, h) };
+  }},
+
+  /* ---------------- number & reasoning ---------------- */
+  "rea.brackets": { group:"reasoning", label:"Brackets", gen(d) {
+    const a = ri(2, tier(d, [5, 6, 8, 10, 12])), b = ri(2, tier(d, [5, 6, 8, 10, 12])),
+          c = ri(2, tier(d, [3, 4, 5, 9, 9]));
+    return pick([
+      () => ({ prompt:`(${a} + ${b}) × ${c} =`, answer:(a + b) * c }),
+      () => ({ prompt:`${c} × (${a} + ${b}) =`, answer:c * (a + b) }),
+      () => ({ prompt:`(${a + b} − ${b}) × ${c} =`, answer:a * c }),
+      () => ({ prompt:`${(a + b) * c} ÷ (${a} + ${b}) =`, answer:c }),
+    ])();
+  }},
+  "rea.bidmas": { group:"reasoning", label:"Order of operations", gen(d) {
+    const a = ri(2, tier(d, [5, 6, 8, 9, 12])), b = ri(2, 9), c = ri(2, 9);
+    return pick([
+      () => ({ prompt:`${a} + ${b} × ${c} =`, answer:a + b * c }),
+      () => ({ prompt:`${a} × ${b} + ${c} =`, answer:a * b + c }),
+      () => ({ prompt:`${b * c + a} − ${b} × ${c} =`, answer:a }),      // always ≥ 2
+      () => ({ prompt:`${a * b} ÷ ${a} + ${c} =`, answer:b + c }),
+      () => ({ prompt:`${a} + ${b * c} ÷ ${b} =`, answer:a + c }),
+      () => { const x = ri(1, a * b - 1); return { prompt:`${a} × ${b} − ${x} =`, answer:a * b - x }; },
+    ])();
+  }},
+  "rea.rounding": { group:"reasoning", label:"Rounding", gen(d) {
+    const to = d >= 4 ? pick([10, 100]) : 10;
+    const n = to === 10 ? ri(11, 499) : ri(101, 4999);
+    return { prompt:`${n} to nearest ${to} =`, answer:Math.round(n / to) * to };
+  }},
+  "rea.placevalue": { group:"reasoning", label:"Place value", gen(d) {
+    const digits = tier(d, [3, 3, 4, 4, 5]);
+    for (let att = 0; att < 30; att++) {
+      const n = ri(10 ** (digits - 1), 10 ** digits - 1);
+      const s = String(n), i = ri(0, s.length - 1), dg = +s[i];
+      if (dg === 0) continue;
+      return { prompt:`The ${dg} in ${n} is worth =`, answer:dg * 10 ** (s.length - 1 - i) };
+    }
+    return { prompt:`Value of the 4 in 3427 =`, answer:400 };   // unreachable fallback
+  }},
+  "rea.sequence": { group:"reasoning", label:"Sequences", decimal:true, gen(d) {
+    if (d >= 4 && Math.random() < .4) {                 // decimal sequence, in tenths
+      const start = ri(5, 60), step = ri(2, 25), t = i => round((start + step * i) / 10);
+      return { prompt:`${fmt(t(0))}, ${fmt(t(1))}, ${fmt(t(2))}, ${fmt(t(3))}, ☐`, answer:t(4) };
+    }
+    const start = ri(1, 20), step = ri(2, 12), t = i => start + step * i;
+    return { prompt:`${t(0)}, ${t(1)}, ${t(2)}, ${t(3)}, ☐`, answer:t(4) };
+  }},
+  "rea.integers": { group:"reasoning", label:"Negative numbers", negative:true, gen(d) {
+    const m = tier(d, [8, 10, 12, 20, 30]);
+    return pick([
+      () => { const a = ri(1, m), b = ri(a + 1, a + m); return { prompt:`${a} − ${b} =`, answer:a - b }; },
+      () => { const a = ri(1, m), b = ri(1, m); return { prompt:`−${a} + ${b} =`, answer:b - a }; },
+      () => { const a = ri(1, m), b = ri(1, m); return { prompt:`−${a} − ${b} =`, answer:-a - b }; },
+      () => { const a = ri(2, 9), b = ri(2, 9); return { prompt:`−${a} × ${b} =`, answer:-a * b }; },
+      () => { const a = ri(2, 9), b = ri(2, 9); return { prompt:`−${a * b} ÷ ${a} =`, answer:-b }; },
+    ])();
+  }},
+  "rea.ratio": { group:"reasoning", label:"Ratio", gen(d) {
+    if (Math.random() < .5) {
+      const k = ri(2, 9), a = ri(1, 6), b = ri(1, 6);
+      return { prompt:`${a * k} : ${b * k} = ${a} : ☐`, answer:b };
+    }
+    const a = ri(1, 4), b = ri(1, 4), unit = ri(2, tier(d, [4, 5, 7, 9, 12]));
+    return { prompt:`${(a + b) * unit} in ratio ${a}:${b} — larger =`,
+             answer:Math.max(a, b) * unit };
+  }},
+  "rea.factors": { group:"reasoning", label:"Factors & primes", gen(d) {
+    const max = tier(d, [18, 22, 30, 40, 60]);
+    const n = ri(6, max);
+    const properFactor = m => { let g = 1; for (let i = 2; i < m; i++) if (m % i === 0) g = i; return g; };
+    // "Biggest factor under n" is a dud question for a prime (the answer is
+    // always 1), so only ask it about composites.
+    if (Math.random() < .5 || properFactor(n) === 1) {
+      let c = 0; for (let i = 1; i <= n; i++) if (n % i === 0) c++;
+      return { prompt:`Factors of ${n} — how many?`, answer:c };
+    }
+    return { prompt:`Biggest factor of ${n} under ${n} =`, answer:properFactor(n) };
+  }},
+  "rea.roots": { group:"reasoning", label:"Square roots", gen(d) {
+    const n = ri(2, tier(d, [8, 10, 12, 15, 20]));
+    return { prompt:`√${n * n} =`, answer:n };
+  }},
+  "rea.average": { group:"reasoning", label:"Mean, median, mode & range", figure:true, gen(d) {
+    const max = tier(d, [10, 12, 15, 20, 20]);
+    const kind = pick(["mean", "median", "range", "mode"]);
+    let vals;
+    if (kind === "mean") {
+      // Build values whose total divides evenly, so the mean is a whole number.
+      const n = tier(d, [4, 4, 5, 5, 6]);
+      vals = Array.from({ length:n - 1 }, () => ri(1, max));
+      const sum = vals.reduce((x, y) => x + y, 0);
+      let last = n * Math.ceil((sum + 1) / n) - sum;
+      while (last > max) last -= n;
+      while (last < 1) last += n;
+      vals.push(last);
+      const mean = (sum + last) / n;
+      return { prompt:`Mean =`, answer:mean, figure:barChartSVG(vals) };
+    }
+    if (kind === "median") {
+      const n = pick([5, 5, 7]);                      // odd, so the median is a data value
+      vals = Array.from({ length:n }, () => ri(1, max));
+      const med = [...vals].sort((a, b) => a - b)[(n - 1) / 2];
+      return { prompt:`Median =`, answer:med, figure:barChartSVG(vals) };
+    }
+    if (kind === "mode") {
+      const n = tier(d, [4, 4, 5, 5, 6]);
+      const rep = ri(1, max);
+      vals = [rep, rep, rep];
+      const used = new Set([rep]);
+      while (vals.length < n) { const v = ri(1, max); if (!used.has(v)) { used.add(v); vals.push(v); } }
+      vals.sort(() => Math.random() - .5);
+      return { prompt:`Mode =`, answer:rep, figure:barChartSVG(vals) };
+    }
+    const n = tier(d, [4, 4, 5, 5, 6]);
+    vals = Array.from({ length:n }, () => ri(1, max));
+    return { prompt:`Range =`, answer:Math.max(...vals) - Math.min(...vals),
+             figure:barChartSVG(vals) };
+  }},
+};
+
+const GROUPS = [
+  { id:"addition",       label:"Addition" },
+  { id:"subtraction",    label:"Subtraction" },
+  { id:"multiplication", label:"Multiplication" },
+  { id:"division",       label:"Division" },
+  { id:"doubles",        label:"Doubles & Halves" },
+  { id:"fdp",            label:"Fractions, Decimals & %" },
+  { id:"measure",        label:"Measurement & Time" },
+  { id:"reasoning",      label:"Number & Reasoning" },
+];
+const topicsInGroup = g => Object.keys(TOPICS).filter(id => TOPICS[id].group === g);
+
+/* ============================================================
+   3. THE 10-LEVEL LADDER
+   Each level carries most of the previous level's topics at a
+   reduced weight and introduces new ones at LOW weight first,
+   promoting them to core weight in the following level. That
+   weighting is what removes the old L2→L3 and L5→L6 cliffs.
+   ============================================================ */
 const LEVELS = [
-  {
-    n:1, title:"Level 1",
-    topics:"Addition from 1–10 · Doubles up to 10",
-    decimals:false,
-    pool:[ () => gAdd(10), () => gDouble(10) ],
-  },
-  {
-    n:2, title:"Level 2",
-    topics:"Addition from 1–20 · Subtraction from 1–20",
-    decimals:false,
-    pool:[ () => gAdd(20), () => gSub(20) ],
-  },
-  {
-    n:3, title:"Level 3",
-    topics:"Add & subtract to 50 · 2, 3, 4, 5, 10 times tables · Doubles & halves to 50 · Missing addends",
-    decimals:false,
-    pool:[
-      () => gAdd(50), () => gSub(50),
-      () => gTable([2, 3, 4, 5, 10], 12),
-      () => gDouble(50), () => gHalf(25),
-      () => gMissAdd(20),
-    ],
-  },
-  {
-    n:4, title:"Level 4",
-    topics:"Add & subtract to 100 · Tables to 10×10 · Doubles & halves to 100 · Division facts · Missing addends & factors",
-    decimals:false,
-    pool:[
-      () => gAdd(100), () => gSub(100),
-      () => gTable([1,2,3,4,5,6,7,8,9,10], 10),
-      () => gDouble(100), () => gHalf(50),
-      () => gDivide([2, 3, 4, 5, 10], 12),
-      () => gMissAdd(50), () => gMissFac(10),
-    ],
-  },
-  {
-    n:5, title:"Level 5",
-    topics:"Addition to 500 · Subtraction to 100 · All × and ÷ facts to 10×10 · Time & length conversions",
-    decimals:false,
-    pool:[
-      () => gAdd(500), () => gSub(100), () => gMissAdd(100),
-      () => gTable([1,2,3,4,5,6,7,8,9,10], 10),
-      () => gDivide([1,2,3,4,5,6,7,8,9,10], 10),
-      gTimeConv, gLengthConv,
-    ],
-  },
-  {
-    n:6, title:"Level 6",
-    topics:"Decimals · Brackets · Percentages · mm, cm & m · 24-hour time · Timetables · Fractions & sequences",
-    decimals:true,
-    pool:[
-      gDecimalOps, gBrackets, gPercent, gMetricConv,
-      g24Hour, gTimetable, gFracDec, gPctDec,
-      gSeqWhole, gSeqDecimal,
-    ],
-  },
+  { n:1, d:1, title:"Bonds to 10", topics:{
+      "add.simple":7, "dbl.double":2, "add.bonds":2 } },
+  { n:2, d:2, title:"Add & subtract to 20", topics:{
+      "add.simple":6, "sub.simple":4, "dbl.double":2, "add.bonds":2 } },
+  { n:3, d:2, title:"First times tables", topics:{
+      "add.simple":4, "sub.simple":3, "mul.tables":3, "dbl.double":2, "dbl.half":2, "add.missing":2 } },
+  { n:4, d:3, title:"Tables to 5 & facts to 50", topics:{
+      "add.simple":3, "sub.simple":3, "mul.tables":5, "div.facts":2,
+      "dbl.double":1, "dbl.half":2, "add.missing":2 } },
+  { n:5, d:4, title:"All tables & facts to 100", topics:{
+      "add.simple":3, "sub.simple":3, "mul.tables":6, "div.facts":4, "mul.missing":2,
+      "dbl.half":2, "rea.rounding":2, "rea.placevalue":1 } },
+  { n:6, d:5, title:"Bigger numbers & mixed operations", topics:{
+      "add.simple":4, "sub.simple":2, "mul.tables":4, "div.facts":3, "add.three":3,
+      "rea.brackets":3, "mul.squares":2, "div.byten":2, "rea.rounding":1, "sub.missing":1 } },
+  { n:7, d:4, title:"Measures, time & shape", topics:{
+      "mea.time":3, "mea.length":3, "mea.mass":2, "mea.time24":2, "mea.timetable":2,
+      "mea.arearect":3, "mea.perimeter":2, "mea.areatri":2, "mul.tables":2, "rea.brackets":1 } },
+  { n:8, d:4, title:"Fractions, decimals & percentages", topics:{
+      "fdp.decimalops":4, "fdp.fracdec":3, "fdp.pctdec":3, "fdp.pctof":3, "fdp.fracof":3,
+      "fdp.equivfrac":2, "mea.metric":2, "mea.volume":2, "mea.arearect":1 } },
+  { n:9, d:4, title:"Order of operations & powers", topics:{
+      "rea.bidmas":4, "rea.integers":3, "rea.sequence":3, "mul.squares":2, "mul.powers":2,
+      "rea.roots":2, "fdp.pctchange":2, "fdp.decimalops":2, "rea.brackets":2 } },
+  { n:10, d:5, title:"Multi-step, ratio & data", topics:{
+      "rea.average":4, "rea.ratio":3, "rea.bidmas":3, "rea.integers":3, "rea.factors":2,
+      "fdp.reversepct":2, "rea.sequence":2, "fdp.pctof":2 } },
 ];
 
-/** Draw a question for a level, avoiding an immediate repeat. */
-function nextQuestion(levelNum, lastPrompt) {
-  const lv = LEVELS[levelNum - 1];
-  let q;
-  for (let i = 0; i < 12; i++) {
-    q = pick(lv.pool)();
-    if (q.prompt !== lastPrompt) break;
+/** Short human summary of a level, built from its topic labels. */
+function levelSummary(lv) {
+  return Object.keys(lv.topics).map(id => TOPICS[id].label).join(" · ");
+}
+/** Build a flat weighted array of topic ids for fast picking. */
+function buildBag(topicWeights) {
+  const bag = [];
+  for (const id in topicWeights) for (let i = 0; i < topicWeights[id]; i++) bag.push(id);
+  return bag;
+}
+const levelHasFigures  = lv => Object.keys(lv.topics).some(id => TOPICS[id].figure);
+const levelHasNegative = lv => Object.keys(lv.topics).some(id => TOPICS[id].negative);
+const anyDecimal = ids => ids.some(id => TOPICS[id].decimal);
+
+/* ============================================================
+   4. QUESTION SOURCE  (no repeats within a race)
+   ============================================================ */
+function drawQuestion(src) {
+  // src: { bag:[topicIds], d:number|0(mixed), seen:Set }
+  let q = null;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const id = pick(src.bag);
+    const d = src.d === 0 ? ri(1, 5) : src.d;
+    const cand = TOPICS[id].gen(d);
+    cand.topic = id;
+    if (!src.seen.has(cand.prompt)) { q = cand; break; }
+    q = cand;                                   // keep the last as a fallback
   }
+  // Pool exhausted (only realistic on level 1, ~110 distinct questions):
+  // clear the history and carry on rather than looping forever.
+  if (src.seen.has(q.prompt)) src.seen.clear();
+  src.seen.add(q.prompt);
   return q;
 }
 
 /**
- * Dev self-test. Run `__selftest()` from the browser console.
- * Asserts every generated question has a finite, non-negative answer,
- * and that only level 6 produces non-integers.
+ * Dev self-test — run `__selftest()` in the console.
+ * Checks every level and every topic for valid answers, correct
+ * negative/decimal placement, and well-formed figures.
  */
-window.__selftest = function (perLevel = 500) {
+window.__selftest = function (perLevel = 600) {
   const problems = [];
   LEVELS.forEach(lv => {
+    const src = { bag:buildBag(lv.topics), d:lv.d, seen:new Set() };
+    const allowNeg = levelHasNegative(lv), allowFig = levelHasFigures(lv);
     for (let i = 0; i < perLevel; i++) {
-      const q = nextQuestion(lv.n, "");
+      const q = drawQuestion(src);
       const a = q.answer;
-      if (typeof a !== "number" || !isFinite(a)) problems.push(`L${lv.n} non-numeric: ${q.prompt} -> ${a}`);
-      else if (a < 0) problems.push(`L${lv.n} negative: ${q.prompt} -> ${a}`);
-      else if (!Number.isInteger(a) && !lv.decimals) problems.push(`L${lv.n} unexpected decimal: ${q.prompt} -> ${a}`);
-      else if (String(a).replace("-", "").replace(".", "").length > 6) problems.push(`L${lv.n} huge: ${q.prompt} -> ${a}`);
-      if (!q.prompt || typeof q.prompt !== "string") problems.push(`L${lv.n} bad prompt`);
+      if (typeof a !== "number" || !isFinite(a)) problems.push(`L${lv.n} ${q.topic}: non-numeric "${q.prompt}" -> ${a}`);
+      else if (a < 0 && !allowNeg) problems.push(`L${lv.n} ${q.topic}: unexpected negative "${q.prompt}" -> ${a}`);
+      else if (Math.abs(a) > 999999) problems.push(`L${lv.n} ${q.topic}: huge "${q.prompt}" -> ${a}`);
+      if (!q.prompt) problems.push(`L${lv.n} ${q.topic}: empty prompt`);
+      if (q.figure) {
+        if (!allowFig) problems.push(`L${lv.n} ${q.topic}: figure on a non-figure level`);
+        if (!/^<svg[\s\S]*<\/svg>$/.test(q.figure)) problems.push(`L${lv.n} ${q.topic}: malformed SVG`);
+        if (/NaN|undefined/.test(q.figure)) problems.push(`L${lv.n} ${q.topic}: NaN in SVG`);
+      }
+      if (/NaN|undefined/.test(q.prompt)) problems.push(`L${lv.n} ${q.topic}: NaN in prompt "${q.prompt}"`);
     }
   });
-  if (problems.length) { console.error("SELFTEST FAILED", problems.slice(0, 25)); return { ok:false, problems }; }
-  console.log(`SELFTEST OK — ${perLevel * LEVELS.length} questions across ${LEVELS.length} levels`);
+  // Every topic must also work standalone at all five difficulties (practice mode).
+  Object.keys(TOPICS).forEach(id => {
+    for (let d = 1; d <= 5; d++) for (let i = 0; i < 40; i++) {
+      const q = TOPICS[id].gen(d);
+      if (typeof q.answer !== "number" || !isFinite(q.answer)) problems.push(`${id} d${d}: bad answer`);
+      if (q.answer < 0 && !TOPICS[id].negative) problems.push(`${id} d${d}: unexpected negative ${q.answer}`);
+      if (/NaN|undefined/.test(q.prompt)) problems.push(`${id} d${d}: NaN in prompt`);
+      if (TOPICS[id].figure && !q.figure) problems.push(`${id} d${d}: missing figure`);
+      // Catches drift: a topic that yields a decimal MUST be flagged, or the
+      // level showing it would render a keypad with no decimal point.
+      if (!Number.isInteger(q.answer) && !TOPICS[id].decimal)
+        problems.push(`${id} d${d}: decimal answer ${q.answer} but not flagged decimal:true`);
+    }
+  });
+  if (problems.length) { console.error("SELFTEST FAILED", problems.slice(0, 30)); return { ok:false, problems }; }
+  console.log(`SELFTEST OK — ${LEVELS.length} levels, ${Object.keys(TOPICS).length} topics`);
   return { ok:true, problems:[] };
 };
 
 /* ============================================================
-   2. AVATARS  (inline SVG, no external assets)
+   5. AVATARS — 24 curated inline-SVG characters
    ============================================================ */
+const SKIN = ["#f8dcc0","#f2c8a0","#e3ab7d","#c98a5e","#a3673c","#7a4a28"];
+const HAIRC = ["#241a12","#4a2c17","#8b5a2b","#c96a1b","#e8c84b","#7b3f9e","#7d7d85","#12100e","#b04a2f","#3f5ea8"];
+const BG = ["#f5a623","#7ed321","#22c1dc","#9b59d0","#e8443a","#2ecc9b","#ff7ab8","#4a90e2",
+            "#ffc233","#5c6bc0","#26a69a","#ef6c9a"];
+
+function hairPath(style, c) {
+  return [
+    /*0 short crop */ `<path d="M15 33c0-10 7-18 17-18s17 8 17 18c0-4-6-8-17-8s-17 4-17 8z" fill="${c}"/>`,
+    /*1 bun       */ `<path d="M15 34c0-11 7-19 17-19s17 8 17 19c0 0-3-10-17-10s-17 10-17 10z" fill="${c}"/><circle cx="32" cy="12" r="7" fill="${c}"/>`,
+    /*2 long      */ `<path d="M14 35c0-12 8-20 18-20s18 8 18 20c0 0-2-11-18-11s-18 11-18 11z" fill="${c}"/><path d="M14 32c-2 9-1 16 1 21l5-2c-2-6-3-13-2-18z" fill="${c}"/><path d="M50 32c2 9 1 16-1 21l-5-2c2-6 3-13 2-18z" fill="${c}"/>`,
+    /*3 fringe    */ `<path d="M15 34c0-11 7-19 17-19s17 8 17 19c0-4-4-7-9-7-4 0-5 3-8 3s-4-3-8-3c-5 0-9 3-9 7z" fill="${c}"/>`,
+    /*4 afro      */ `<circle cx="32" cy="30" r="21" fill="${c}"/><circle cx="16" cy="34" r="9" fill="${c}"/><circle cx="48" cy="34" r="9" fill="${c}"/>`,
+    /*5 ponytail  */ `<path d="M15 33c0-11 7-18 17-18s17 7 17 18c0-4-6-8-17-8s-17 4-17 8z" fill="${c}"/><path d="M48 28c6 2 9 8 8 15-1 5-4 8-7 9l-2-5c2-1 4-3 4-6 1-5-1-9-5-11z" fill="${c}"/>`,
+    /*6 spiky     */ `<path d="M15 33 20 19 24 28 28 15 32 27 36 15 40 28 44 19 49 33c0-4-6-8-17-8s-17 4-17 8z" fill="${c}"/>`,
+    /*7 buzz      */ `<path d="M16 33c0-9 7-16 16-16s16 7 16 16c0-3-6-6-16-6s-16 3-16 6z" fill="${c}" opacity=".92"/>`,
+    /*8 braids    */ `<path d="M15 33c0-11 7-18 17-18s17 7 17 18c0-4-6-8-17-8s-17 4-17 8z" fill="${c}"/><path d="M14 33c-3 7-3 14-1 20l5-1c-2-6-2-12 0-17z" fill="${c}"/><path d="M50 33c3 7 3 14 1 20l-5-1c2-6 2-12 0-17z" fill="${c}"/><circle cx="16" cy="55" r="3" fill="${c}"/><circle cx="48" cy="55" r="3" fill="${c}"/>`,
+    /*9 wavy      */ `<path d="M14 35c0-12 8-20 18-20s18 8 18 20c0 0-2-11-18-11s-18 11-18 11z" fill="${c}"/><path d="M15 33c-3 6-2 12 1 17 2-3 2-7 1-11z" fill="${c}"/><path d="M49 33c3 6 2 12-1 17-2-3-2-7-1-11z" fill="${c}"/>`,
+  ][style];
+}
+function accessory(kind, c) {
+  if (kind === "glasses") return `<g fill="none" stroke="#33404d" stroke-width="2"><circle cx="25" cy="37" r="6.5" fill="#eaf6ff" fill-opacity=".55"/><circle cx="39" cy="37" r="6.5" fill="#eaf6ff" fill-opacity=".55"/><path d="M31.5 37h1M18.5 35.5 19 37M45.5 35.5 45 37"/></g>`;
+  if (kind === "headphones") return `<g><path d="M13 38a19 19 0 0 1 38 0" fill="none" stroke="#33404d" stroke-width="3.5"/><rect x="8" y="34" width="9" height="14" rx="4" fill="${c}" stroke="#33404d" stroke-width="2"/><rect x="47" y="34" width="9" height="14" rx="4" fill="${c}" stroke="#33404d" stroke-width="2"/></g>`;
+  if (kind === "cap") return `<g><path d="M14 28a18 18 0 0 1 36 0v3H14z" fill="${c}" stroke="#0006" stroke-width=".5"/><path d="M46 28h11c1 0 1 4-1 4H46z" fill="${c}"/><circle cx="32" cy="11" r="2.6" fill="${c}"/></g>`;
+  if (kind === "beanie") return `<g><path d="M14 30a18 18 0 0 1 36 0v2H14z" fill="${c}"/><rect x="12" y="29" width="40" height="7" rx="3.5" fill="#fff" fill-opacity=".28"/><circle cx="32" cy="10" r="3.2" fill="${c}"/></g>`;
+  if (kind === "freckles") return `<g fill="#0000001f"><circle cx="22" cy="42" r="1.2"/><circle cx="26" cy="44" r="1.2"/><circle cx="42" cy="42" r="1.2"/><circle cx="38" cy="44" r="1.2"/></g>`;
+  return "";
+}
+/* 24 curated combinations: [bg, skin, hairStyle, hairColour, accessory, accColour] */
 const AVATARS = [
-  { bg:"#f5a623", skin:"#f7c9a0", hair:"#4a2c17", style:0 },
-  { bg:"#7ed321", skin:"#e0a878", hair:"#1f1a17", style:1 },
-  { bg:"#22c1dc", skin:"#f9d7b8", hair:"#c96a1b", style:2 },
-  { bg:"#9b59d0", skin:"#b87a4e", hair:"#2b1d12", style:3 },
-  { bg:"#e8443a", skin:"#f7c9a0", hair:"#e8c84b", style:1 },
-  { bg:"#2ecc9b", skin:"#8d5a35", hair:"#151210", style:0 },
-  { bg:"#ff7ab8", skin:"#f9d7b8", hair:"#7b3f9e", style:2 },
-  { bg:"#4a90e2", skin:"#e0a878", hair:"#8b8b8b", style:3 },
+  [0,1,0,1,null,null],       [1,3,1,0,null,null],       [2,0,2,3,"freckles",null], [3,4,4,7,null,null],
+  [4,1,3,4,"glasses",null],  [5,5,7,7,null,null],       [6,0,5,5,null,null],       [7,2,6,6,"headphones","#e8443a"],
+  [8,3,8,0,null,null],       [9,1,9,2,"glasses",null],  [10,4,0,7,"cap","#e8443a"],[11,0,1,4,null,null],
+  [0,5,4,0,"freckles",null], [1,2,2,8,null,null],       [2,3,6,1,"beanie","#9b59d0"],[3,0,3,9,null,null],
+  [4,4,5,7,"glasses",null],  [5,1,8,3,null,null],       [6,2,9,5,"headphones","#22c1dc"],[7,5,1,7,null,null],
+  [8,0,7,2,"cap","#2ecc9b"], [9,3,0,8,"freckles",null], [10,1,2,6,null,null],      [11,4,6,0,"beanie","#f5a623"],
 ];
 function avatarSVG(i) {
-  const a = AVATARS[((i % AVATARS.length) + AVATARS.length) % AVATARS.length];
-  const hair = [
-    `<path d="M15 33c0-10 7-18 17-18s17 8 17 18c0-4-6-8-17-8s-17 4-17 8z" fill="${a.hair}"/>`,
-    `<path d="M14 35c0-12 8-20 18-20s18 8 18 20c0 0-3-10-18-10s-18 10-18 10z" fill="${a.hair}"/><circle cx="32" cy="13" r="7" fill="${a.hair}"/>`,
-    `<path d="M14 35c0-12 8-20 18-20s18 8 18 20c0 0-2-11-18-11s-18 11-18 11z" fill="${a.hair}"/><path d="M14 32c-2 9-1 15 1 20l5-2c-2-6-3-12-2-17z" fill="${a.hair}"/><path d="M50 32c2 9 1 15-1 20l-5-2c2-6 3-12 2-17z" fill="${a.hair}"/>`,
-    `<path d="M15 34c0-11 7-19 17-19s17 8 17 19c0-4-4-7-9-7-4 0-5 3-8 3s-4-3-8-3c-5 0-9 3-9 7z" fill="${a.hair}"/>`,
-  ][a.style];
+  const [bg, skin, hs, hc, acc, accC] = AVATARS[((i % AVATARS.length) + AVATARS.length) % AVATARS.length];
+  const sk = SKIN[skin], hair = HAIRC[hc];
+  // The afro is a full disc, so it must sit BEHIND the face — drawn in front
+  // it covers the features and the avatar reads as a dark blob.
+  const behind = hs === 4, hairSVG = hairPath(hs, hair);
   return `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <circle cx="32" cy="32" r="32" fill="${a.bg}"/>
-    <ellipse cx="15" cy="38" rx="4" ry="5" fill="${a.skin}"/>
-    <ellipse cx="49" cy="38" rx="4" ry="5" fill="${a.skin}"/>
-    <ellipse cx="32" cy="37" rx="17" ry="19" fill="${a.skin}"/>
-    ${hair}
-    <circle cx="25.5" cy="37" r="2.6" fill="#2b2b2b"/>
-    <circle cx="38.5" cy="37" r="2.6" fill="#2b2b2b"/>
-    <circle cx="26.4" cy="36.2" r=".9" fill="#fff"/>
-    <circle cx="39.4" cy="36.2" r=".9" fill="#fff"/>
-    <path d="M25 45c2 3.4 5 5 7 5s5-1.6 7-5" stroke="#8a4a35" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="32" fill="${BG[bg]}"/>
+    ${behind ? hairSVG : ""}
+    <ellipse cx="15" cy="39" rx="4" ry="5" fill="${sk}"/>
+    <ellipse cx="49" cy="39" rx="4" ry="5" fill="${sk}"/>
+    <ellipse cx="32" cy="37" rx="17" ry="19" fill="${sk}"/>
+    ${behind ? "" : hairSVG}
+    <circle cx="25.5" cy="37" r="2.6" fill="#2b2b2b"/><circle cx="38.5" cy="37" r="2.6" fill="#2b2b2b"/>
+    <circle cx="26.4" cy="36.1" r=".9" fill="#fff"/><circle cx="39.4" cy="36.1" r=".9" fill="#fff"/>
+    <path d="M25 45c2 3.4 5 5 7 5s5-1.6 7-5" stroke="#9c5a42" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    ${accessory(acc, accC || BG[bg])}
   </svg>`;
 }
 
-const BOT_NAMES = ["Ravi","Mia","Sam","Zoe","Leo","Ana","Kai","Nina","Omar","Tess","Jules","Bo"];
-const LANE_COLORS = { you:"var(--lime)", bots:["var(--orange)","var(--cyan)","var(--purple)"] };
-
-/* Bot answer-rate bands (correct answers per minute), indexed by level. */
-const BOT_RATES = { 1:[34,56], 2:[30,46], 3:[25,38], 4:[22,34], 5:[18,28], 6:[14,24] };
+const BOT_NAMES = ["Ravi","Mia","Sam","Zoe","Leo","Ana","Kai","Nina","Omar","Tess","Jules","Bo","Iris","Finn","Aya"];
+const BOT_COLORS = ["var(--orange)","var(--cyan)","var(--purple)"];
+/* Bot answer-rate bands (correct answers per minute) by level. */
+const BOT_RATES = { 1:[34,56], 2:[30,46], 3:[26,40], 4:[23,35], 5:[20,31],
+                    6:[17,27], 7:[14,23], 8:[13,21], 9:[11,19], 10:[9,16] };
 
 /* ============================================================
-   3. PERSISTENT STATE
+   6. PERSISTENT STATE
    ============================================================ */
-const SAVE_KEY = "mathletics.save.v1";
+const SAVE_KEY = "mathletix.save.v1";
+const OLD_SAVE_KEY = "mathletics.save.v2";   // saves from before the rename
 const state = {
   name:"You", avatar:0, muted:false,
-  inputMode:"auto",          // "auto" | "touch" | "keys"
+  inputMode:"auto",
   challengeLevel:1,
-  highs:{},                  // { levelNumber: bestScore }
+  highs:{},          // level -> best score
+  speeds:{},         // level -> best seconds per correct answer
+  practice:{ topics:null, timer:60, diff:3, limit:0, bots:false },
+  pstats:{ answered:0, correct:0 },
 };
 function load() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) Object.assign(state, JSON.parse(raw));
-  } catch (e) { /* corrupt or unavailable storage — fall back to defaults */ }
+    // Fall back to the pre-rename key so existing progress carries over;
+    // the next save() writes it under the new name.
+    const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      Object.assign(state, o);
+      state.practice = Object.assign({ topics:null, timer:60, diff:3, limit:0, bots:false }, o.practice || {});
+      state.pstats = Object.assign({ answered:0, correct:0 }, o.pstats || {});
+    }
+  } catch (e) { /* unavailable or corrupt storage — defaults are fine */ }
+  if (!state.practice.topics) state.practice.topics = topicsInGroup("addition").slice();
 }
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
@@ -697,62 +1089,87 @@ function save() {
 }
 
 /* ============================================================
-   4. SOUND  (WebAudio only — no audio files)
+   7. SOUND
    ============================================================ */
 let audioCtx = null;
-function tone(freq, dur = 0.09, type = "sine", gain = 0.16, delay = 0) {
-  if (state.muted) return;
+/** Build the AudioContext up front on a user gesture, never inside a keypress. */
+function warmAudio() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { /* no audio available */ }
+}
+function tone(freq, dur = .09, type = "sine", gain = .16, delay = 0) {
+  if (state.muted || !audioCtx) return;
+  try {
     const t0 = audioCtx.currentTime + delay;
     const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
     osc.type = type; osc.frequency.setValueAtTime(freq, t0);
     g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(gain, t0 + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    g.gain.linearRampToValueAtTime(gain, t0 + .012);
+    g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
     osc.connect(g); g.connect(audioCtx.destination);
-    osc.start(t0); osc.stop(t0 + dur + 0.02);
-  } catch (e) { /* audio unavailable — silent is fine */ }
+    osc.start(t0); osc.stop(t0 + dur + .02);
+  } catch (e) { /* ignore */ }
 }
 const sfx = {
-  correct(){ tone(660, .08, "triangle", .16); tone(990, .1, "triangle", .13, .06); },
-  wrong(){ tone(150, .2, "sawtooth", .11); },
-  key(){ tone(430, .03, "square", .05); },
-  tick(){ tone(880, .05, "square", .09); },
-  start(){ tone(520, .12, "triangle", .15); },
-  finish(){ [523, 659, 784, 1047].forEach((f, i) => tone(f, .26, "triangle", .17, i * .11)); },
+  correct(){ tone(660,.08,"triangle",.16); tone(990,.1,"triangle",.13,.06); },
+  wrong(){ tone(150,.2,"sawtooth",.11); },
+  key(){ tone(430,.03,"square",.05); },
+  tick(){ tone(880,.05,"square",.09); },
+  start(){ tone(520,.12,"triangle",.15); },
+  finish(){ [523,659,784,1047].forEach((f,i)=>tone(f,.26,"triangle",.17,i*.11)); },
 };
+/* Haptics. Browsers reject vibrate() before the user has tapped the page and
+   log an error, so gate on a real interaction rather than calling blind. */
+let hasInteracted = false;
+["pointerdown", "keydown"].forEach(ev =>
+  window.addEventListener(ev, () => { hasInteracted = true; }, { once:true, capture:true }));
+function buzz(ms) {
+  if (!hasInteracted || state.muted || !navigator.vibrate) return;
+  try { navigator.vibrate(ms); } catch (e) {}
+}
 
 /* ============================================================
-   5. SCREEN ROUTER
+   8. SCREEN ROUTER
    ============================================================ */
 let currentScreen = "home";
 function show(name) {
   currentScreen = name;
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $("screen-" + name).classList.add("active");
-  window.scrollTo(0, 0);
+  document.body.classList.toggle("racing", name === "race");
+  if (name !== "race") window.scrollTo(0, 0);
 }
 document.querySelectorAll("[data-go]").forEach(b =>
   b.addEventListener("click", () => show(b.dataset.go)));
 
 /* ============================================================
-   6. HOME SCREEN
+   9. HOME
    ============================================================ */
 function renderAvatars() {
   $("avatarGrid").innerHTML = AVATARS.map((_, i) =>
     `<button class="avatar-pick" data-avatar="${i}" aria-pressed="${i === state.avatar}"
        aria-label="Avatar ${i + 1}">${avatarSVG(i)}</button>`).join("");
-  $("avatarGrid").querySelectorAll("[data-avatar]").forEach(b =>
-    b.addEventListener("click", () => {
-      state.avatar = +b.dataset.avatar; save(); renderAvatars(); sfx.key();
-    }));
 }
+$("avatarGrid").addEventListener("click", e => {
+  const b = e.target.closest("[data-avatar]");
+  if (!b) return;
+  state.avatar = +b.dataset.avatar; save();
+  $("avatarGrid").querySelectorAll("[data-avatar]").forEach(x =>
+    x.setAttribute("aria-pressed", x === b));
+  warmAudio(); sfx.key();
+});
 $("nameInput").addEventListener("input", e => {
   state.name = e.target.value.trim().slice(0, 12) || "You"; save();
 });
-$("goLevels").addEventListener("click", () => { renderLevels(); show("levels"); });
+$("goLevels").addEventListener("click", () => { warmAudio(); renderLevels(); show("levels"); });
+$("goPractice").addEventListener("click", () => { warmAudio(); renderPractice(); show("practice"); });
+$("resetBtn").addEventListener("click", () => {
+  if (!confirm("Erase all saved progress — high scores, challenge level, avatar and settings?")) return;
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(OLD_SAVE_KEY); } catch (e) {}
+  location.reload();
+});
 
 const MODE_LABEL = { auto:"Auto", touch:"Phone", keys:"Laptop" };
 function refreshToggles() {
@@ -766,10 +1183,9 @@ $("modeToggle").addEventListener("click", () => {
   if (currentScreen === "race") renderInputArea();
 });
 $("soundToggle").addEventListener("click", () => {
-  state.muted = !state.muted; save(); refreshToggles(); sfx.key();
+  state.muted = !state.muted; save(); refreshToggles(); warmAudio(); sfx.key();
 });
 
-/** Effective input mode: manual override wins, otherwise sniff the device. */
 function usingTouch() {
   if (state.inputMode === "touch") return true;
   if (state.inputMode === "keys") return false;
@@ -779,157 +1195,270 @@ function usingTouch() {
 }
 
 /* ============================================================
-   7. LEVEL SELECT
+   10. LEVEL SELECT
    ============================================================ */
 function renderLevels() {
   $("levelList").innerHTML = LEVELS.map(lv => {
-    const isChallenge = lv.n === state.challengeLevel;
+    const isCh = lv.n === state.challengeLevel;
     const high = state.highs[lv.n] || 0;
-    return `<button class="level-card ${isChallenge ? "challenge" : ""}" data-level="${lv.n}">
+    return `<button class="level-card ${isCh ? "challenge" : ""}" data-level="${lv.n}">
       <div class="level-num">${lv.n}</div>
       <div class="level-body">
-        <strong>${lv.title} ${isChallenge ? '<span class="star">★</span>' : ""}</strong>
-        <span>${lv.topics}</span>
+        <strong>${lv.title}${isCh ? ' <span class="star">★</span>' : ""}</strong>
+        <span>${levelSummary(lv)}</span>
       </div>
       <div class="level-meta">${high ? `<b>${high}</b>best` : ""}</div>
     </button>`;
   }).join("");
-  $("levelList").querySelectorAll("[data-level]").forEach(b =>
-    b.addEventListener("click", () => startRace(+b.dataset.level)));
 }
+$("levelList").addEventListener("click", e => {
+  const b = e.target.closest("[data-level]");
+  if (b) startRace({ mode:"level", level:+b.dataset.level });
+});
 
 /* ============================================================
-   8. RACE
+   11. PRACTICE SETUP
    ============================================================ */
-const RACE_MS = 60000;
-let race = null;
-let rafId = null;
+const TIMER_OPTS = [[0,"Off"],[30,"30s"],[60,"60s"],[90,"90s"],[120,"2 min"],[300,"5 min"]];
+const DIFF_OPTS  = [[2,"Easy"],[3,"Medium"],[5,"Hard"],[0,"Mixed"]];
+const LIMIT_OPTS = [[0,"No limit"],[10,"10 Qs"],[20,"20 Qs"],[50,"50 Qs"],[100,"100 Qs"]];
+const BOT_OPTS   = [[0,"Solo"],[1,"3 bots"]];
 
-function startRace(levelNum) {
-  const [lo, hi] = BOT_RATES[levelNum];
+const pOn = id => state.practice.topics.includes(id);
+function setTopic(id, on) {
+  const t = state.practice.topics;
+  const i = t.indexOf(id);
+  if (on && i < 0) t.push(id);
+  if (!on && i >= 0) t.splice(i, 1);
+  save();
+}
+function seg(el, opts, current, onPick) {
+  el.innerHTML = opts.map(([v, lab]) =>
+    `<button data-v="${v}" aria-pressed="${v === current}">${lab}</button>`).join("");
+  el.onclick = e => {
+    const b = e.target.closest("[data-v]");
+    if (!b) return;
+    onPick(+b.dataset.v); sfx.key();
+  };
+}
+let openGroups = {};
+function renderPractice() {
+  $("groupList").innerHTML = GROUPS.map(g => {
+    const ids = topicsInGroup(g.id);
+    const on = ids.filter(pOn).length;
+    const st = on === 0 ? "0" : on === ids.length ? "1" : "half";
+    return `<div class="grp ${openGroups[g.id] ? "open" : ""}" data-grp="${g.id}">
+      <div class="grp-head">
+        <button class="sw" data-toggle-group="${g.id}" data-on="${st}" aria-label="Toggle ${g.label}"></button>
+        <button class="gname" data-open="${g.id}">${g.label}</button>
+        <span class="gcount">${on}/${ids.length}</span>
+        <button class="chev" data-open="${g.id}">▶</button>
+      </div>
+      <div class="grp-body">
+        ${ids.map(id => `<div class="sub">
+            <span class="sname">${TOPICS[id].label}
+              ${TOPICS[id].figure ? '<span class="fig-tag">FIGURE</span>' : ""}
+              ${TOPICS[id].negative ? '<span class="fig-tag">−</span>' : ""}</span>
+            <button class="sw" data-toggle-topic="${id}" data-on="${pOn(id) ? 1 : 0}"
+              aria-label="Toggle ${TOPICS[id].label}"></button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+
+  const n = state.practice.topics.length;
+  $("topicCount").textContent = `${n} selected`;
+  $("startPractice").disabled = n === 0;
+  $("practiceNote").textContent = n === 0
+    ? "Turn on at least one topic to start."
+    : (state.practice.timer === 0 && state.practice.limit === 0)
+      ? "No timer and no question limit — this run continues until you quit."
+      : "";
+
+  seg($("segTimer"), TIMER_OPTS, state.practice.timer, v => { state.practice.timer = v; save(); renderPractice(); });
+  seg($("segDiff"),  DIFF_OPTS,  state.practice.diff,  v => { state.practice.diff = v; save(); renderPractice(); });
+  seg($("segLimit"), LIMIT_OPTS, state.practice.limit, v => { state.practice.limit = v; save(); renderPractice(); });
+  seg($("segBots"),  BOT_OPTS,   state.practice.bots ? 1 : 0, v => { state.practice.bots = !!v; save(); renderPractice(); });
+}
+$("groupList").addEventListener("click", e => {
+  const openBtn = e.target.closest("[data-open]");
+  if (openBtn) { const g = openBtn.dataset.open; openGroups[g] = !openGroups[g]; renderPractice(); return; }
+  const gBtn = e.target.closest("[data-toggle-group]");
+  if (gBtn) {
+    const ids = topicsInGroup(gBtn.dataset.toggleGroup);
+    const allOn = ids.every(pOn);
+    ids.forEach(id => setTopic(id, !allOn));
+    sfx.key(); renderPractice(); return;
+  }
+  const tBtn = e.target.closest("[data-toggle-topic]");
+  if (tBtn) { const id = tBtn.dataset.toggleTopic; setTopic(id, !pOn(id)); sfx.key(); renderPractice(); }
+});
+$("selAll").addEventListener("click", () => {
+  state.practice.topics = Object.keys(TOPICS).slice(); save(); renderPractice();
+});
+$("selNone").addEventListener("click", () => {
+  state.practice.topics = []; save(); renderPractice();
+});
+$("startPractice").addEventListener("click", () => {
+  if (!state.practice.topics.length) return;
+  startRace({ mode:"practice" });
+});
+
+/* ============================================================
+   12. RACE
+   ============================================================ */
+let race = null, rafId = null, raceToken = 0;
+
+function startRace(opts) {
+  warmAudio();
+  const isPractice = opts.mode === "practice";
+  const lv = isPractice ? null : LEVELS[opts.level - 1];
+  const p  = state.practice;
+
+  const topicIds = isPractice ? p.topics.slice() : Object.keys(lv.topics);
+  const bag = isPractice ? topicIds.slice() : buildBag(lv.topics);
+  const anyFigure = topicIds.some(id => TOPICS[id].figure);
+  const anyNeg    = topicIds.some(id => TOPICS[id].negative);
+  const anyDec    = anyDecimal(topicIds);
+
+  const durationMs = isPractice ? (p.timer ? p.timer * 1000 : 0) : 60000;
+  const withBots   = isPractice ? p.bots : true;
+  const rates      = BOT_RATES[isPractice ? 5 : opts.level];
+
   const botNames = [];
-  while (botNames.length < 3) {
+  if (withBots) while (botNames.length < 3) {
     const n = pick(BOT_NAMES);
     if (!botNames.includes(n) && n !== state.name) botNames.push(n);
   }
-  // Give each bot a distinct avatar, none matching the player's.
-  const avatarPool = AVATARS.map((_, i) => i).filter(i => i !== state.avatar);
-  for (let i = avatarPool.length - 1; i > 0; i--) {          // Fisher-Yates
-    const j = ri(0, i);
-    [avatarPool[i], avatarPool[j]] = [avatarPool[j], avatarPool[i]];
-  }
+  const pool = AVATARS.map((_, i) => i).filter(i => i !== state.avatar);
+  for (let i = pool.length - 1; i > 0; i--) { const j = ri(0, i); [pool[i], pool[j]] = [pool[j], pool[i]]; }
 
   race = {
-    level:levelNum,
-    doubled:levelNum === state.challengeLevel,
-    startedAt:0,
-    running:false,
-    typed:"",
-    lastPrompt:"",
-    current:null,
-    wrong:[],
-    lastTickSecond:-1,
+    token:++raceToken,          // stale countdowns from an abandoned race check this
+    mode:opts.mode,
+    level:opts.level || 0,
+    doubled:!isPractice && opts.level === state.challengeLevel,
+    src:{ bag, d:isPractice ? p.diff : lv.d, seen:new Set() },
+    durationMs, limit:isPractice ? p.limit : 0,
+    hasFigures:anyFigure, needsDot:anyDec, needsNeg:anyNeg,
+    startedAt:0, running:false,
+    typed:"", current:null, wrong:[],
+    answered:0, correct:0, streak:0, bestStreak:0,
+    lanesDirty:true, lastShownSec:-1, lastTickSec:-1,
     players:[
-      { name:state.name, avatar:state.avatar, color:LANE_COLORS.you, score:0, you:true },
-      ...botNames.map((n, i) => {
-        const rate = lo + Math.random() * (hi - lo);
-        return {
-          name:n,
-          avatar:avatarPool[i % avatarPool.length],
-          color:LANE_COLORS.bots[i],
-          score:0, you:false,
-          interval:60000 / rate,
-          nextAt:0,
-        };
-      }),
+      { name:state.name, avatar:state.avatar, color:"var(--lime)", score:0, you:true },
+      ...botNames.map((n, i) => ({
+        name:n, avatar:pool[i % pool.length], color:BOT_COLORS[i], score:0, you:false,
+        interval:60000 / (rates[0] + Math.random() * (rates[1] - rates[0])), nextAt:0,
+      })),
     ],
   };
 
-  $("raceLevelLabel").innerHTML =
-    `Level ${levelNum}` + (race.doubled ? ` <span class="dbl">★ double points</span>` : "");
-  renderLanes();
-  renderInputArea();
+  $("raceLevelLabel").innerHTML = isPractice
+    ? `Practice · ${state.practice.topics.length} topics`
+    : `Level ${opts.level} — ${lv.title}` + (race.doubled ? ` <span class="dbl">★ double points</span>` : "");
+  $("streakLabel").textContent = "";
+  $("figureSlot").classList.toggle("reserved", anyFigure);
+  $("figureSlot").innerHTML = "";
   $("answerBox").textContent = "";
   $("questionText").textContent = "";
-  setTimerVisual(1, 60);
+  renderLanes();
+  renderInputArea(true);
+  setTimerVisual(1, durationMs ? Math.round(durationMs / 1000) : 0, true);
   show("race");
-  runCountdown();
+  runCountdown(race.token);
 }
 
-/** 3–2–1 intro, then the clock starts. */
-function runCountdown() {
+/** The token makes a countdown abandon itself if its race was quit and
+    another started — otherwise the stale timeout begins the NEW race early,
+    leaving two frame loops running against one race. */
+function runCountdown(tok) {
   const el = document.createElement("div");
   el.className = "countdown";
   document.body.appendChild(el);
   let n = 3;
   const step = () => {
-    if (!race) { el.remove(); return; }   // quit during the intro — stand down
-    if (n > 0) {
-      el.innerHTML = `<span>${n}</span>`;
-      sfx.start();
-      n--;
-      setTimeout(step, 700);
-    } else {
-      el.innerHTML = `<span>GO!</span>`;
-      sfx.correct();
-      setTimeout(() => { el.remove(); if (race) beginRace(); }, 500);
-    }
+    if (!race || race.token !== tok) { el.remove(); return; }
+    if (n > 0) { el.innerHTML = `<span>${n}</span>`; sfx.start(); n--; setTimeout(step, 650); }
+    else { el.innerHTML = `<span>GO!</span>`; sfx.correct();
+           setTimeout(() => { el.remove(); if (race && race.token === tok) beginRace(); }, 450); }
   };
   step();
 }
 
 function beginRace() {
+  if (race.running) return;                          // never start the same race twice
   const now = performance.now();
   race.startedAt = now;
   race.running = true;
-  race.players.forEach(p => { if (!p.you) p.nextAt = now + p.interval * (0.5 + Math.random()); });
+  race.players.forEach(p => { if (!p.you) p.nextAt = now + p.interval * (.5 + Math.random()); });
   askQuestion();
   rafId = requestAnimationFrame(tick);
 }
 
 function askQuestion() {
-  race.current = nextQuestion(race.level, race.lastPrompt);
-  race.lastPrompt = race.current.prompt;
+  const q = drawQuestion(race.src);
+  race.current = q;
   race.typed = "";
-  $("questionText").textContent = race.current.prompt;
+  const qt = $("questionText");
+  qt.textContent = q.prompt;
+  qt.className = "question" + (q.prompt.length > 26 ? " xlong" : q.prompt.length > 15 ? " long" : "");
+  if (race.hasFigures) $("figureSlot").innerHTML = q.figure || "";
   drawAnswer();
 }
 
 function drawAnswer() {
+  // Single DOM write per keypress.
   const box = $("answerBox");
-  box.textContent = race.typed;
-  if (!race.typed) box.innerHTML = '<span class="caret"></span>';
+  if (race.typed) box.textContent = race.typed.replace("-", "−");
+  else box.innerHTML = '<span class="caret"></span>';
 }
 
-/* ---- the frame loop: timer, bots, lane widths ---- */
+/* ---- frame loop ---- */
 function tick(now) {
   if (!race || !race.running) return;
   const elapsed = now - race.startedAt;
-  const remain = Math.max(0, RACE_MS - elapsed);
-  const secs = Math.ceil(remain / 1000);
 
-  setTimerVisual(remain / RACE_MS, secs);
-  if (secs <= 5 && secs > 0 && secs !== race.lastTickSecond) { sfx.tick(); race.lastTickSecond = secs; }
+  if (race.durationMs) {
+    const remain = Math.max(0, race.durationMs - elapsed);
+    const secs = Math.ceil(remain / 1000);
+    setTimerVisual(remain / race.durationMs, secs);
+    if (secs <= 5 && secs > 0 && secs !== race.lastTickSec) { sfx.tick(); race.lastTickSec = secs; }
+    if (remain <= 0) { endRace(); return; }
+  } else {
+    // No timer: count up instead, updating only when the second changes.
+    const secs = Math.floor(elapsed / 1000);
+    if (secs !== race.lastShownSec) { race.lastShownSec = secs; $("timerNum").textContent = secs; }
+  }
 
-  // Bots score on a jittered schedule so their arrows advance unevenly.
-  race.players.forEach(p => {
-    if (p.you) return;
-    while (now >= p.nextAt && race.running) {
-      p.score++;
-      p.nextAt += p.interval * (0.6 + Math.random() * 0.8);
-    }
-  });
-  updateLanes();
+  advanceBots(now);
+  if (race.lanesDirty) { updateLanes(); race.lanesDirty = false; }
 
-  if (remain <= 0) { endRace(); return; }
   rafId = requestAnimationFrame(tick);
 }
 
+/** Bots score on a jittered schedule. The guard stops a huge catch-up
+    loop if the tab was hidden for a long stretch. */
+function advanceBots(now) {
+  race.players.forEach(p => {
+    if (p.you) return;
+    let guard = 0;
+    while (now >= p.nextAt && guard++ < 200) {
+      p.score++;
+      p.nextAt += p.interval * (.6 + Math.random() * .8);
+      race.lanesDirty = true;
+    }
+    if (guard >= 200) p.nextAt = now + p.interval;   // resync after a long absence
+  });
+}
+
 const RING_LEN = 2 * Math.PI * 44;
-function setTimerVisual(frac, secs) {
+function setTimerVisual(frac, secs, init) {
   const ring = $("ringFg");
-  ring.style.strokeDasharray = RING_LEN;
+  if (init) ring.style.strokeDasharray = RING_LEN;   // constant — set once, not per frame
   ring.style.strokeDashoffset = RING_LEN * (1 - Math.max(0, Math.min(1, frac)));
+  if (secs === race?.lastShownSec && !init) return;  // text and classes only on second change
+  if (race) race.lastShownSec = secs;
   $("timerNum").textContent = secs;
   const t = $("timer");
   t.classList.toggle("warn", secs <= 15 && secs > 5);
@@ -941,63 +1470,94 @@ function renderLanes() {
     <div class="lane ${p.you ? "you" : ""}">
       <div class="racer-box">${avatarSVG(p.avatar)}<span class="rname">${escapeHTML(p.name)}</span></div>
       <div class="track">
+        ${p.you ? '<div class="pb" id="pbMark"></div>' : ""}
         <div class="arrow" id="arrow${i}" style="background:${p.color};width:4%"></div>
         <span class="lane-score" id="lscore${i}" style="left:4%">0</span>
       </div>
     </div>`).join("");
 }
 
+/** Called only when a score actually changes — not every frame. */
 function updateLanes() {
-  const leader = Math.max(1, ...race.players.map(p => p.score));
+  const best = race.mode === "level" ? (state.highs[race.level] || 0) : 0;
+  const leader = Math.max(1, best, ...race.players.map(p => p.score));
   race.players.forEach((p, i) => {
-    const w = 4 + (p.score / leader) * 80;   // 4% → 84%, leaving room for the number
+    const w = 4 + (p.score / leader) * 80;
     const arrow = $("arrow" + i), sc = $("lscore" + i);
     if (!arrow) return;
     arrow.style.width = w + "%";
     sc.style.left = w + "%";
     sc.textContent = p.score;
   });
+  const pb = $("pbMark");
+  if (pb) {
+    if (best > 0) { pb.classList.add("on"); pb.style.left = (4 + (best / leader) * 80) + "%"; }
+    else pb.classList.remove("on");
+  }
 }
-
-const escapeHTML = s => String(s).replace(/[&<>"']/g,
-  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 
 /* ---- answering ---- */
 function press(key) {
   if (!race || !race.running) return;
-  if (key === "back") { race.typed = race.typed.slice(0, -1); sfx.key(); drawAnswer(); return; }
+  if (key === "back")  { race.typed = race.typed.slice(0, -1); sfx.key(); drawAnswer(); return; }
   if (key === "enter") { submitAnswer(); return; }
-  if (key === "." && (race.typed.includes(".") || !LEVELS[race.level - 1].decimals)) return;
-  if (race.typed.length >= 7) return;
+  if (key === "neg") {
+    if (!race.needsNeg) return;
+    race.typed = race.typed.startsWith("-") ? race.typed.slice(1) : "-" + race.typed;
+    sfx.key(); drawAnswer(); return;
+  }
+  if (key === "." && (race.typed.includes(".") || !race.needsDot)) return;
+  if (race.typed.replace("-", "").length >= 7) return;
   race.typed += key;
   sfx.key();
   drawAnswer();
 }
 
+function floatText(txt, color) {
+  const box = $("answerBox"), r = box.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "float"; el.textContent = txt; el.style.color = color;
+  el.style.left = (r.left + r.width / 2 - 12) + "px";
+  el.style.top = (r.top - 4) + "px";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 700);
+}
+
 function submitAnswer() {
   if (!race || !race.running) return;
   const raw = race.typed.trim();
-  if (raw === "" || raw === ".") return;          // ignore empty submissions
+  if (raw === "" || raw === "." || raw === "-") return;      // ignore empty submissions
   const given = parseFloat(raw);
   const box = $("answerBox");
   const correct = isFinite(given) && Math.abs(given - race.current.answer) < 1e-9;
 
+  race.answered++;
   if (correct) {
-    const me = race.players[0];
-    me.score += race.doubled ? 2 : 1;
-    box.classList.add("correct");
-    sfx.correct();
+    race.correct++;
+    race.streak++;
+    race.bestStreak = Math.max(race.bestStreak, race.streak);
+    race.players[0].score += race.doubled ? 2 : 1;
+    race.lanesDirty = true;
     updateLanes();
+    box.classList.remove("good"); void box.offsetWidth; box.classList.add("good");
+    floatText(race.doubled ? "+2" : "+1", "#7ed321");
+    sfx.correct(); buzz(12);
   } else {
-    race.wrong.push({ prompt:race.current.prompt, answer:race.current.answer, given:raw });
-    box.classList.add("wrong");
-    sfx.wrong();
+    race.streak = 0;
+    race.wrong.push({ prompt:race.current.prompt, answer:race.current.answer,
+                      given:raw.replace("-", "−"), figure:race.current.figure || "" });
+    box.classList.remove("bad"); void box.offsetWidth; box.classList.add("bad");
+    sfx.wrong(); buzz([18, 40, 18]);
   }
-  setTimeout(() => box.classList.remove("correct", "wrong"), 260);
+  $("streakLabel").textContent = race.streak >= 3 ? `🔥 ${race.streak} in a row` : "";
+
+  // The next question appears immediately — the flash is a one-shot animation
+  // on the box, so feedback never bleeds over the new question.
+  if (race.limit && race.answered >= race.limit) { endRace(); return; }
   askQuestion();
 }
 
-/* ---- input surfaces ---- */
+/* ---- input surfaces (built once, then only on mode change) ---- */
 const KEYPAD_HTML = `
   <div class="keypad" id="keypad">
     <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
@@ -1005,24 +1565,49 @@ const KEYPAD_HTML = `
     <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
     <button class="k-enter" data-k="enter">↵</button>
     <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
-    <button class="k-dot" data-k=".">.</button><button class="k-zero" data-k="0">0</button>
+    <button class="k-dot" data-k=".">.</button>
+    <button class="k-zero" data-k="0">0</button>
+    <button class="k-neg" data-k="neg">−</button>
   </div>`;
+const KB_HTML = `<div class="kb-hint">Type your answer &nbsp;·&nbsp;
+  <kbd>Enter</kbd> to submit &nbsp;·&nbsp; <kbd>Esc</kbd> to quit</div>`;
 
-function renderInputArea() {
+let renderedMode = null, renderedFlags = null;
+/**
+ * Rebuilding this DOM mid-tap was what dropped keypresses on mobile,
+ * because `resize` fires constantly as the URL bar collapses. It now
+ * only rebuilds when the effective mode or key set actually changes.
+ */
+function renderInputArea(force) {
+  const mode = usingTouch() ? "touch" : "keys";
+  const flags = race ? `${race.needsDot ? "d" : ""}${race.needsNeg ? "n" : ""}` : "";
+  if (!force && mode === renderedMode && flags === renderedFlags) return;
+  renderedMode = mode; renderedFlags = flags;
+
   const area = $("inputArea");
-  if (usingTouch()) {
+  if (mode === "touch") {
     area.innerHTML = KEYPAD_HTML;
-    if (race && LEVELS[race.level - 1].decimals) $("keypad").classList.add("with-dot");
-    area.querySelectorAll("[data-k]").forEach(b => {
-      // pointerdown beats click for responsiveness on touch; preventDefault
-      // stops the follow-up synthetic click and any double-tap zoom.
-      b.addEventListener("pointerdown", e => { e.preventDefault(); press(b.dataset.k); });
-    });
+    const kp = $("keypad");
+    kp.classList.toggle("with-dot", !!(race && race.needsDot));
+    kp.classList.toggle("with-neg", !!(race && race.needsNeg));
   } else {
-    area.innerHTML = `<div class="kb-hint">Type your answer &nbsp;·&nbsp;
-      <kbd>Enter</kbd> to submit &nbsp;·&nbsp; <kbd>Esc</kbd> to quit</div>`;
+    area.innerHTML = KB_HTML;
   }
 }
+
+/* Delegated handlers, bound ONCE — they survive every re-render. */
+let pressedBtn = null;
+function clearPressed() { if (pressedBtn) { pressedBtn.classList.remove("pressed"); pressedBtn = null; } }
+$("inputArea").addEventListener("pointerdown", e => {
+  const b = e.target.closest("[data-k]");
+  if (!b) return;
+  e.preventDefault();                  // no synthetic click, no double-tap zoom
+  clearPressed();
+  pressedBtn = b; b.classList.add("pressed");
+  press(b.dataset.k);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(ev =>
+  $("inputArea").addEventListener(ev, clearPressed));
 
 window.addEventListener("keydown", e => {
   if (currentScreen !== "race") return;
@@ -1030,70 +1615,119 @@ window.addEventListener("keydown", e => {
   if (!race || !race.running) return;
   if (e.key >= "0" && e.key <= "9") { press(e.key); e.preventDefault(); }
   else if (e.key === ".") { press("."); e.preventDefault(); }
+  else if (e.key === "-") { press("neg"); e.preventDefault(); }
   else if (e.key === "Backspace") { press("back"); e.preventDefault(); }
   else if (e.key === "Enter") { press("enter"); e.preventDefault(); }
 });
 
 function quitRace() {
   if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  // A practice run with no timer and no question limit can ONLY end by
+  // quitting, so treat that as finishing — otherwise the whole session
+  // (score, accuracy, review list, stats) is silently discarded.
+  if (race && race.running && race.mode === "practice" && race.answered > 0) { endRace(); return; }
+  const wasPractice = race && race.mode === "practice";
   if (race) race.running = false;
   race = null;
-  renderLevels();
-  show("levels");
+  if (wasPractice) { renderPractice(); show("practice"); }
+  else { renderLevels(); show("levels"); }
 }
 $("quitRace").addEventListener("click", quitRace);
 
+/* The clock keeps running while the tab is hidden (chosen behaviour).
+   rAF halts, so on return we recompute rather than trusting the loop. */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !race || !race.running) return;
+  const now = performance.now();
+  advanceBots(now);
+  race.lanesDirty = true;
+  if (race.durationMs && now - race.startedAt >= race.durationMs) { endRace(); return; }
+  if (!rafId) rafId = requestAnimationFrame(tick);
+});
+
 /* ============================================================
-   9. RESULTS
+   13. RESULTS
    ============================================================ */
 function endRace() {
+  // Reachable from the frame loop, the question limit, visibilitychange and
+  // quit — guard so stats and challenge-level promotion can't double-count.
+  if (!race || race.ended) return;
+  race.ended = true;
   race.running = false;
   if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
   sfx.finish();
 
-  const me = race.players[0];
-  const score = me.score;
-  const prevHigh = state.highs[race.level] || 0;
-  const isHigh = score > prevHigh;
-  if (isHigh) state.highs[race.level] = score;
+  const elapsedS = Math.max(1, (performance.now() - race.startedAt) / 1000);
+  const score = race.players[0].score;
+  const acc = race.answered ? Math.round(race.correct / race.answered * 100) : 0;
+  const spd = race.correct ? round(elapsedS / race.correct, 2) : 0;
+  const badges = [];
 
-  // Advance the challenge level after a strong run on it.
-  let advanced = false;
-  if (race.level === state.challengeLevel && score >= 20 && state.challengeLevel < LEVELS.length) {
-    state.challengeLevel++;
-    advanced = true;
+  if (race.mode === "level") {
+    const prev = state.highs[race.level] || 0;
+    if (score > prev) {
+      state.highs[race.level] = score;
+      badges.push(`<div class="badge">★ ${prev ? `New best — beat ${prev}` : "First score on this level"}</div>`);
+    }
+    const prevSpd = state.speeds[race.level] || 0;
+    if (spd > 0 && (prevSpd === 0 || spd < prevSpd)) {
+      state.speeds[race.level] = spd;
+      if (prevSpd) badges.push(`<div class="badge">⚡ Fastest yet — was ${prevSpd}s</div>`);
+    }
+    if (race.level === state.challengeLevel && score >= 20 && state.challengeLevel < LEVELS.length) {
+      state.challengeLevel++;
+      badges.push(`<div class="badge">Challenge level → ${state.challengeLevel}</div>`);
+    }
+  } else {
+    // Practice keeps its own stats and never touches level records.
+    state.pstats.answered += race.answered;
+    state.pstats.correct  += race.correct;
   }
   save();
 
   $("finalScore").textContent = score;
-  $("finalSub").textContent = race.doubled ? "points (doubled — challenge level)" : "points";
-
-  const badges = [];
-  if (isHigh && prevHigh > 0) badges.push(`<div class="badge">★ New best — beat ${prevHigh}</div>`);
-  else if (isHigh) badges.push(`<div class="badge">★ First score on this level</div>`);
-  if (advanced) badges.push(`<div class="badge">Challenge level → ${state.challengeLevel}</div>`);
+  $("finalSub").textContent = race.mode === "practice"
+    ? "correct in practice"
+    : (race.doubled ? "points (doubled — challenge level)" : "points");
   $("finalBadges").innerHTML = badges.join(" ");
 
+  const prevSpd = race.mode === "level" ? (state.speeds[race.level] || 0) : 0;
+  $("finalStats").innerHTML = `
+    <div class="stat"><b>${acc}%</b><span>Accuracy</span></div>
+    <div class="stat"><b>${spd || "—"}${spd ? "s" : ""}</b><span>Per answer</span></div>
+    <div class="stat"><b>${race.bestStreak}</b><span>Best streak</span></div>
+    <div class="stat"><b>${race.answered}</b><span>Attempted</span></div>`;
+
   const ranked = [...race.players].sort((a, b) => b.score - a.score);
-  $("standings").innerHTML = ranked.map((p, i) => `
+  $("standings").innerHTML = race.players.length > 1 ? ranked.map((p, i) => `
     <div class="standing ${p.you ? "you" : ""}">
-      <div class="place">${i + 1}</div>
-      ${avatarSVG(p.avatar)}
+      <div class="place">${i + 1}</div>${avatarSVG(p.avatar)}
       <div class="standing-name">${escapeHTML(p.name)}</div>
       <div class="standing-score">${p.score}</div>
-    </div>`).join("");
+    </div>`).join("") : "";
 
   $("goReview").textContent = race.wrong.length ? `Review (${race.wrong.length})` : "Review";
+  $("backToChoice").textContent = race.mode === "practice" ? "Change setup" : "Change level";
   show("results");
 }
 
-$("playAgain").addEventListener("click", () => { if (race) startRace(race.level); });
+$("playAgain").addEventListener("click", () => {
+  if (!race) return;
+  race.mode === "practice" ? startRace({ mode:"practice" })
+                           : startRace({ mode:"level", level:race.level });
+});
+$("backToChoice").addEventListener("click", () => {
+  if (race && race.mode === "practice") { renderPractice(); show("practice"); }
+  else { renderLevels(); show("levels"); }
+});
 $("goReview").addEventListener("click", () => { renderReview(); show("review"); });
 
 function renderReview() {
   const list = $("reviewList");
   if (!race || !race.wrong.length) {
-    list.innerHTML = `<p class="empty-note">Nothing missed — a clean race.<br>Every answer you submitted was correct.</p>`;
+    list.innerHTML = `<p class="empty-note">Nothing missed — a clean run.<br>Every answer you submitted was correct.</p>`;
     return;
   }
   list.innerHTML = race.wrong.map(w => `
@@ -1101,18 +1735,26 @@ function renderReview() {
       <span class="review-q">${escapeHTML(w.prompt.replace(/ =$/, ""))}</span>
       <span class="review-given">${escapeHTML(w.given)}</span>
       <span class="review-arrow">→</span>
-      <span class="review-ans">${fmt(w.answer)}</span>
+      <span class="review-ans">${fmt(w.answer).replace("-", "−")}</span>
+      ${w.figure ? `<div class="review-fig">${w.figure}</div>` : ""}
     </div>`).join("");
 }
 
 /* ============================================================
-   10. BOOT
+   14. BOOT
    ============================================================ */
 load();
 $("nameInput").value = state.name === "You" ? "" : state.name;
 renderAvatars();
 refreshToggles();
+
+/* Only react to a resize if the effective input mode actually flipped —
+   mobile fires resize constantly as the URL bar hides. */
+let lastTouchState = usingTouch();
 window.addEventListener("resize", () => {
+  const now = usingTouch();
+  if (now === lastTouchState) return;
+  lastTouchState = now;
   refreshToggles();
   if (currentScreen === "race" && race) renderInputArea();
 });
