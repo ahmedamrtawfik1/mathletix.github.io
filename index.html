@@ -1,4 +1,3 @@
-<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1668c4">
@@ -11,18 +10,8 @@
 <title>Mathletix</title>
 <style>
 /* ============================================================
-   MATHLETIX — local single-file build (v3)
+   MATHLETIX — local single-file build (v2)
    Flat solid blue arena, white panels, saturated flat lanes.
-
-   v3 fixes (see the audit notes at each site):
-   · keypad grid — `.k-dot`/`.k-neg` could never hide, so every
-     level rendered a 6-column pad with unusable 15px keys
-   · question strip — sized by character count, so long prompts
-     were ellipsised into a DIFFERENT question
-   · challenge star rendered grey at body size, not gold
-   · high scores were stored in doubled points on the challenge
-     level, making them permanently unbeatable afterwards
-   · practice bots ignored the chosen difficulty
    ============================================================ */
 :root{
   --blue:#1668c4;
@@ -140,19 +129,10 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .level-card.challenge .level-num{background:var(--gold);color:#5a3d00}
 .level-body{flex:1;min-width:0}
 .level-body strong{display:flex;align-items:center;gap:7px;font-size:16.5px;font-weight:800;margin-bottom:3px}
-/* Targets the summary by class, not by tag. As `.level-body span` this also
-   matched the `.star` span inside the <strong>, repainting the challenge
-   marker grey at body size — the bug `.level-body .star` below works around.
-   Hard cap at two lines: levelSummary() trims to the headline topics, and the
-   clamp stops one long label turning a card into a paragraph. */
-.level-body .level-sum{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-  overflow:hidden;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.4}
+.level-body span{display:block;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.4}
 .level-meta{flex:none;text-align:right;font-size:11px;font-weight:800;color:var(--ink-soft)}
 .level-meta b{display:block;font-size:20px;color:var(--blue);line-height:1.1}
-/* Scoped to `.level-body` for the same reason as the keypad keys: bare `.star`
-   is (0,1,0) and loses to `.level-body span` (0,1,1), which rendered the
-   challenge marker as grey 12.5px body text instead of a gold 17px star. */
-.level-body .star{color:var(--gold-ink);font-size:17px;flex:none;line-height:1}
+.star{color:var(--gold-ink);font-size:17px;flex:none}
 
 /* ============================================================
    PRACTICE SETUP
@@ -200,26 +180,13 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   display:flex;align-items:center;gap:14px;box-shadow:0 5px 0 rgba(0,0,0,.16)}
 .qline{flex:1;display:flex;align-items:center;gap:14px;min-width:0}
 /* Word-based prompts ("Mean =", "Round 515 to the nearest 100 =") are far
-   longer than "7 + 6 =". Shrink the type instead of wrapping, so the strip
-   keeps a fixed height and nothing shifts under the player.
-
-   These three sizes are candidates only — fitQuestion() picks between them by
-   MEASURING the rendered text. Choosing by character count (the v2 behaviour)
-   truncated "3818 to nearest 100 =" to "3818 to nearest 10…", which is a
-   different, still-answerable question: the player answered what they saw and
-   was marked wrong with no way to tell why. Never clip a prompt. */
+   longer than "7 + 6 =". Shrink the type by prompt length instead of wrapping,
+   so the strip keeps a fixed height and nothing shifts under the player. */
 .question{font-size:clamp(21px,4.6vw,40px);font-weight:800;color:var(--ink);
-  white-space:nowrap;line-height:1.1;overflow:hidden}
-/* `long` wraps to two lines rather than staying on one. Kept as nowrap it could
-   not fit "Mean of 17, 16, 10 =" on a phone, so fitQuestion dropped straight
-   past it to the 13px bucket; wrapping keeps that prompt at 16px. Costs no
-   layout shift — .race-top is 70px either way, set by the 50px answer box. */
-.question.long{font-size:clamp(16px,3.4vw,30px);white-space:normal;
-  line-height:1.15;max-height:2.4em}
-/* 2.4em, not 2.3em: at line-height 1.15 two lines measure exactly 2.3em, so the
-   old cap left zero slack and sub-pixel rounding read as overflow. */
+  white-space:nowrap;line-height:1.1;overflow:hidden;text-overflow:ellipsis}
+.question.long{font-size:clamp(16px,3.4vw,30px)}
 .question.xlong{font-size:clamp(13px,2.6vw,23px);white-space:normal;
-  line-height:1.15;max-height:2.4em}
+  line-height:1.15;max-height:2.3em;text-overflow:clip}
 .answerbox{flex:none;min-width:clamp(104px,21vw,180px);height:clamp(50px,8.5vw,70px);
   border:4px solid var(--blue);border-radius:12px;background:#f4f9ff;
   display:flex;align-items:center;justify-content:center;
@@ -295,14 +262,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   background:var(--lime);color:#1d3d04;box-shadow:0 4px 0 var(--lime-dark);font-size:30px}
 .keypad .k-enter.pressed{box-shadow:0 1px 0 var(--lime-dark);background:#8ee02c}
 .keypad .k-back{grid-column:4;grid-row:1;background:#dbe7f2;font-size:22px}
-/* These MUST stay scoped to `.keypad`. Bare `.k-dot,.k-neg{display:none}` is
-   specificity (0,1,0) and loses to `.keypad button{…display:flex…}` above at
-   (0,1,1) — so the dot and minus keys never hid, and because they carry an
-   explicit grid-row with an auto column the pad spilled into implicit columns
-   5 and 6, squashing 4, 5 and 3 down to ~15px. */
-.keypad .k-dot,.keypad .k-zero,.keypad .k-neg{grid-row:4}
-.keypad .k-dot,.keypad .k-neg{display:none}
-.keypad .k-zero{grid-column:1 / span 3}
+.k-dot,.k-zero,.k-neg{grid-row:4}
+.k-dot,.k-neg{display:none}
+.k-zero{grid-column:1 / span 3}
 .keypad.with-dot .k-dot{display:flex;grid-column:1}
 .keypad.with-dot .k-zero{grid-column:2 / span 2}
 .keypad.with-neg .k-neg{display:flex;grid-column:3}
@@ -416,7 +378,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   <div class="wrap">
     <div class="level-list" id="levelList"></div>
     <p class="hint-note">★ marks your challenge level — points are <b>doubled</b> there.
-      Score 20+ <b>points</b> on it (10 correct) to unlock the next one.</p>
+      Score 20+ on it to unlock the next one.</p>
   </div>
 </section>
 
@@ -447,7 +409,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
     </div>
     <button class="btn" id="startPractice">Start practice &nbsp;▶</button>
     <p class="hint-note" id="practiceNote"></p>
-    <p class="hint-note" id="pstatsNote"></p>
   </div>
 </section>
 
@@ -480,10 +441,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 <!-- =========================== RESULTS =========================== -->
 <section class="screen" id="screen-results">
-  <div class="topbar">
-    <button class="icon-btn" data-go="home">‹</button>
-    <h2>Results</h2>
-  </div>
   <div class="wrap">
     <div class="result-hero">
       <div class="big" id="finalScore">0</div>
@@ -518,11 +475,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 const $ = id => document.getElementById(id);
 const ri = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-/** Fisher–Yates, in place. `arr.sort(() => Math.random() - .5)` is not a shuffle. */
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) { const j = ri(0, i); [arr[i], arr[j]] = [arr[j], arr[i]]; }
-  return arr;
-}
 const round = (n, p = 6) => Math.round(n * 10 ** p) / 10 ** p;
 const fmt = n => String(round(n, 6));
 const p2 = n => String(n).padStart(2, "0");
@@ -850,6 +802,7 @@ const TOPICS = {
      median/mode/range use 5. */
   "rea.average": { group:"reasoning", label:"Mean, median, mode & range", gen(d) {
     const max = tier(d, [10, 12, 15, 20, 20]);
+    const shuffled = a => a.sort(() => Math.random() - .5);
     switch (pick(["mean", "median", "mode", "range"])) {
       case "mean": {
         // Pick two freely, then choose a third that makes the total divide by 3
@@ -861,7 +814,7 @@ const TOPICS = {
         const room = Math.floor((max - last) / 3);
         if (room > 0) last += 3 * ri(0, room);
         vals.push(last);
-        shuffle(vals);
+        shuffled(vals);
         return { prompt:`Mean of ${vals.join(", ")} =`, answer:(sum + last) / 3 };
       }
       case "median": {
@@ -874,7 +827,7 @@ const TOPICS = {
         // less obvious than three copies out of five.
         const rep = ri(1, max), vals = [rep, rep], used = new Set([rep]);
         while (vals.length < 5) { const v = ri(1, max); if (!used.has(v)) { used.add(v); vals.push(v); } }
-        shuffle(vals);
+        shuffled(vals);
         return { prompt:`Mode of ${vals.join(", ")} =`, answer:rep };
       }
       default: {
@@ -935,15 +888,9 @@ const LEVELS = [
       "fdp.reversepct":2, "rea.sequence":2, "fdp.pctof":2 } },
 ];
 
-/** Short human summary of a level: the topics it leans on most, not all of them.
-    Listing every label ran to ~195 characters on levels 6-10 and turned each
-    card into a paragraph — ten levels needed two full screens of scrolling. */
-const SUMMARY_TOPICS = 4;
+/** Short human summary of a level, built from its topic labels. */
 function levelSummary(lv) {
-  const ids = Object.keys(lv.topics).sort((a, b) => lv.topics[b] - lv.topics[a]);
-  const head = ids.slice(0, SUMMARY_TOPICS).map(id => TOPICS[id].label).join(" · ");
-  const rest = ids.length - SUMMARY_TOPICS;
-  return rest > 0 ? `${head} +${rest} more` : head;
+  return Object.keys(lv.topics).map(id => TOPICS[id].label).join(" · ");
 }
 /** Build a flat weighted array of topic ids for fast picking. */
 function buildBag(topicWeights) {
@@ -977,114 +924,9 @@ function drawQuestion(src) {
 }
 
 /**
- * The half of the suite that touches the DOM. Every one of these guards a bug
- * that shipped in v2 while the generator checks below reported a clean pass.
- * Runs at whatever the current viewport is — worth running on a phone too.
- */
-function renderChecks() {
-  const out = [];
-
-  if (document.compatMode !== "CSS1Compat")
-    out.push(`compatMode is "${document.compatMode}" — <!doctype html> is missing, so this is quirks mode`);
-
-  // Snapshot everything about to be disturbed, so running this mid-race is survivable.
-  const prev = {
-    screen:currentScreen, race, mode:renderedMode, flags:renderedFlags,
-    q:$("questionText").textContent, qCls:$("questionText").className,
-    qSize:$("questionText").style.fontSize,
-    figCls:$("figureSlot").className, figHTML:$("figureSlot").innerHTML,
-  };
-  const qt = $("questionText");
-
-  try {
-    /* --- the challenge star must read as gold, not as body text ---
-       `.star` at (0,1,0) lost to `.level-body span` at (0,1,1) and rendered
-       grey at 12.5px, which made the whole progression system invisible. */
-    renderLevels(); show("levels");
-    const star = document.querySelector(".level-card .star");
-    if (!star) out.push("level list: no challenge star rendered");
-    else {
-      const ss = getComputedStyle(star);
-      const body = getComputedStyle(document.querySelector(".level-sum"));
-      if (ss.color === body.color) out.push(`star colour ${ss.color} matches the summary text — it is not standing out`);
-      if (parseFloat(ss.fontSize) <= parseFloat(body.fontSize))
-        out.push(`star font-size ${ss.fontSize} is not larger than the summary's ${body.fontSize}`);
-    }
-
-    show("race");
-
-    /* --- keypad integrity across all four key sets ---
-       v2 rendered SIX grid columns on every level because `.k-dot`/`.k-neg`
-       could not hide, squashing 4, 5 and 3 into ~15px slivers. */
-    [[false,false],[true,false],[false,true],[true,true]].forEach(([dot, neg]) => {
-      const tag = `keypad dot:${dot ? 1 : 0} neg:${neg ? 1 : 0}`;
-      race = { needsDot:dot, needsNeg:neg };
-      renderInputArea(true);
-      const kp = $("keypad");
-      if (!kp) { out.push(`${tag}: not rendered`); return; }
-
-      const cols = getComputedStyle(kp).gridTemplateColumns.split(/\s+/).filter(Boolean);
-      if (cols.length !== 4) { out.push(`${tag}: ${cols.length} grid columns, expected 4 — ${cols.join(" ")}`); return; }
-      const colW = parseFloat(cols[0]);
-      if (cols.some(c => Math.abs(parseFloat(c) - colW) > 1)) out.push(`${tag}: columns are uneven — ${cols.join(" ")}`);
-
-      [...kp.children].forEach(b => {
-        if (getComputedStyle(b).display === "none") return;
-        const w = b.getBoundingClientRect().width;
-        if (w < colW * .9) out.push(`${tag}: key "${b.dataset.k}" is ${Math.round(w)}px against a ${Math.round(colW)}px column`);
-      });
-
-      const shown = k => {
-        const el = kp.querySelector(`[data-k="${k}"]`);
-        return !!el && getComputedStyle(el).display !== "none";
-      };
-      if (shown(".") !== dot) out.push(`${tag}: decimal key is ${shown(".") ? "visible" : "hidden"}`);
-      if (shown("neg") !== neg) out.push(`${tag}: negative key is ${shown("neg") ? "visible" : "hidden"}`);
-    });
-
-    /* --- no prompt may ever be clipped ---
-       This is the check that would have caught "3818 to nearest 100 =" being
-       shown as "3818 to nearest 10…", a different and wrongly-marked question. */
-    // Uses the same questionClipped() predicate as fitQuestion, so the test and
-    // the implementation cannot drift apart on what "clipped" means. Also flags
-    // prompts that only fit by being shaved below the smallest bucket, which is
-    // legible-but-ugly and worth knowing about.
-    const checkFit = (label, p) => {
-      fitQuestion(qt, p);
-      if (questionClipped(qt)) out.push(`${label}: prompt CLIPPED at ${window.innerWidth}px — "${p}"`);
-      else if (qt.style.fontSize) out.push(`${label}: prompt shaved to ${qt.style.fontSize} at ${window.innerWidth}px — "${p}"`);
-    };
-
-    race = { hasFigures:false };
-    $("figureSlot").className = "figure-slot";
-    Object.keys(TOPICS).forEach(id => {
-      for (let d = 1; d <= 5; d++) for (let i = 0; i < 12; i++) checkFit(`${id} d${d}`, TOPICS[id].gen(d).prompt);
-    });
-    // Same again with the figure slot reserved, which is the tighter layout.
-    race = { hasFigures:true };
-    $("figureSlot").className = "figure-slot reserved";
-    Object.keys(TOPICS).filter(id => TOPICS[id].figure).forEach(id => {
-      for (let d = 1; d <= 5; d++) checkFit(`${id} d${d} (figure)`, TOPICS[id].gen(d).prompt);
-    });
-  } finally {
-    race = prev.race;
-    renderedMode = prev.mode; renderedFlags = prev.flags;
-    renderInputArea(true);
-    qt.textContent = prev.q; qt.className = prev.qCls; qt.style.fontSize = prev.qSize;
-    $("figureSlot").className = prev.figCls; $("figureSlot").innerHTML = prev.figHTML;
-    show(prev.screen);
-  }
-  return out;
-}
-
-/**
- * Dev self-test — run `__selftest()` in the console, or load the page with
- * `#selftest` to run it on boot and see the verdict on the page itself.
- *
- * Checks every level and every topic for valid answers, correct negative/decimal
- * placement, and well-formed figures — and then RENDERS, because the v2 suite
- * passed cleanly while the keypad was unusable and questions were being clipped
- * into different questions. Generator correctness is not app correctness.
+ * Dev self-test — run `__selftest()` in the console.
+ * Checks every level and every topic for valid answers, correct
+ * negative/decimal placement, and well-formed figures.
  */
 window.__selftest = function (perLevel = 600) {
   const problems = [];
@@ -1120,7 +962,6 @@ window.__selftest = function (perLevel = 600) {
         problems.push(`${id} d${d}: decimal answer ${q.answer} but not flagged decimal:true`);
     }
   });
-  problems.push(...renderChecks());
   if (problems.length) { console.error("SELFTEST FAILED", problems.slice(0, 30)); return { ok:false, problems }; }
   console.log(`SELFTEST OK — ${LEVELS.length} levels, ${Object.keys(TOPICS).length} topics`);
   return { ok:true, problems:[] };
@@ -1190,36 +1031,26 @@ const BOT_COLORS = ["var(--orange)","var(--cyan)","var(--purple)"];
 /* Bot answer-rate bands (correct answers per minute) by level. */
 const BOT_RATES = { 1:[34,56], 2:[30,46], 3:[26,40], 4:[23,35], 5:[20,31],
                     6:[17,27], 7:[14,23], 8:[13,21], 9:[11,19], 10:[9,16] };
-/* Practice has no level, so map its difficulty setting onto the ladder to pick
-   a bot band. Keys are the DIFF_OPTS values: Easy 2, Medium 3, Hard 5, Mixed 0. */
-const PRACTICE_BOT_LEVEL = { 2:3, 3:6, 5:9, 0:6 };
 
 /* ============================================================
    6. PERSISTENT STATE
    ============================================================ */
-/* v2 changes the unit stored in `highs` from points to correct answers — see
-   endRace(). Old keys stay in the read chain so nothing is lost on upgrade. */
-const SAVE_KEY = "mathletix.save.v2";
-const OLD_SAVE_KEYS = ["mathletix.save.v1", "mathletics.save.v2"];
+const SAVE_KEY = "mathletix.save.v1";
+const OLD_SAVE_KEY = "mathletics.save.v2";   // saves from before the rename
 const state = {
   name:"You", avatar:0, muted:false,
   inputMode:"auto",
   challengeLevel:1,
-  highs:{},          // level -> best number of CORRECT ANSWERS (not points)
+  highs:{},          // level -> best score
   speeds:{},         // level -> best seconds per correct answer
   practice:{ topics:null, timer:60, diff:3, limit:0, bots:false },
   pstats:{ answered:0, correct:0 },
 };
 function load() {
   try {
-    // Fall back through the older keys so existing progress carries over;
-    // the next save() writes it under the current name.
-    // Note: a pre-v2 `highs` entry for a level that was the challenge level at
-    // the time is recorded in doubled points and so reads high. It cannot be
-    // told apart from an honest score, so it is carried across as-is and simply
-    // takes a better run to beat once. New entries use correct-answer counts.
-    let raw = localStorage.getItem(SAVE_KEY);
-    for (const k of OLD_SAVE_KEYS) { if (raw) break; raw = localStorage.getItem(k); }
+    // Fall back to the pre-rename key so existing progress carries over;
+    // the next save() writes it under the new name.
+    const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY);
     if (raw) {
       const o = JSON.parse(raw);
       Object.assign(state, o);
@@ -1315,7 +1146,7 @@ $("goLevels").addEventListener("click", () => { warmAudio(); renderLevels(); sho
 $("goPractice").addEventListener("click", () => { warmAudio(); renderPractice(); show("practice"); });
 $("resetBtn").addEventListener("click", () => {
   if (!confirm("Erase all saved progress — high scores, challenge level, avatar and settings?")) return;
-  try { [SAVE_KEY, ...OLD_SAVE_KEYS].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(OLD_SAVE_KEY); } catch (e) {}
   location.reload();
 });
 
@@ -1348,14 +1179,12 @@ function usingTouch() {
 function renderLevels() {
   $("levelList").innerHTML = LEVELS.map(lv => {
     const isCh = lv.n === state.challengeLevel;
-    // A count of correct answers, so it stays comparable whether or not this
-    // level was the doubled challenge level when the best was set.
     const high = state.highs[lv.n] || 0;
     return `<button class="level-card ${isCh ? "challenge" : ""}" data-level="${lv.n}">
       <div class="level-num">${lv.n}</div>
       <div class="level-body">
         <strong>${lv.title}${isCh ? ' <span class="star">★</span>' : ""}</strong>
-        <span class="level-sum">${levelSummary(lv)}</span>
+        <span>${levelSummary(lv)}</span>
       </div>
       <div class="level-meta">${high ? `<b>${high}</b>best` : ""}</div>
     </button>`;
@@ -1425,13 +1254,6 @@ function renderPractice() {
       ? "No timer and no question limit — this run continues until you quit."
       : "";
 
-  // Lifetime practice totals. These were being accumulated on every run and
-  // then never shown anywhere.
-  const ps = state.pstats;
-  $("pstatsNote").textContent = ps.answered
-    ? `Practice so far: ${ps.correct} correct of ${ps.answered} · ${Math.round(ps.correct / ps.answered * 100)}%`
-    : "";
-
   seg($("segTimer"), TIMER_OPTS, state.practice.timer, v => { state.practice.timer = v; save(); renderPractice(); });
   seg($("segDiff"),  DIFF_OPTS,  state.practice.diff,  v => { state.practice.diff = v; save(); renderPractice(); });
   seg($("segLimit"), LIMIT_OPTS, state.practice.limit, v => { state.practice.limit = v; save(); renderPractice(); });
@@ -1468,7 +1290,6 @@ let race = null, rafId = null, raceToken = 0;
 
 function startRace(opts) {
   warmAudio();
-  clearCountdowns();          // a countdown abandoned mid-flight must not outlive its race
   const isPractice = opts.mode === "practice";
   const lv = isPractice ? null : LEVELS[opts.level - 1];
   const p  = state.practice;
@@ -1481,16 +1302,15 @@ function startRace(opts) {
 
   const durationMs = isPractice ? (p.timer ? p.timer * 1000 : 0) : 60000;
   const withBots   = isPractice ? p.bots : true;
-  // Practice used to hard-code the level-5 band, so bots ran at the same speed
-  // whether you picked Easy or Hard. Map the chosen difficulty onto the ladder.
-  const rates      = BOT_RATES[isPractice ? (PRACTICE_BOT_LEVEL[p.diff] || 6) : opts.level];
+  const rates      = BOT_RATES[isPractice ? 5 : opts.level];
 
   const botNames = [];
   if (withBots) while (botNames.length < 3) {
     const n = pick(BOT_NAMES);
     if (!botNames.includes(n) && n !== state.name) botNames.push(n);
   }
-  const pool = shuffle(AVATARS.map((_, i) => i).filter(i => i !== state.avatar));
+  const pool = AVATARS.map((_, i) => i).filter(i => i !== state.avatar);
+  for (let i = pool.length - 1; i > 0; i--) { const j = ri(0, i); [pool[i], pool[j]] = [pool[j], pool[i]]; }
 
   race = {
     token:++raceToken,          // stale countdowns from an abandoned race check this
@@ -1528,13 +1348,6 @@ function startRace(opts) {
   runCountdown(race.token);
 }
 
-/** Drop any countdown overlay still on screen. The token check inside
-    runCountdown only fires on the NEXT step, so quitting mid-countdown left a
-    full-screen opaque panel over the level list for up to 650ms. */
-function clearCountdowns() {
-  document.querySelectorAll(".countdown").forEach(el => el.remove());
-}
-
 /** The token makes a countdown abandon itself if its race was quit and
     another started — otherwise the stale timeout begins the NEW race early,
     leaving two frame loops running against one race. */
@@ -1562,61 +1375,14 @@ function beginRace() {
   rafId = requestAnimationFrame(tick);
 }
 
-/* The size buckets are candidates, not a decision. v2 chose between them by
-   COUNTING CHARACTERS while the space available is measured in pixels, so on a
-   phone the `long` bucket (nowrap + ellipsis) silently clipped real prompts:
-   "3818 to nearest 100 =" rendered as "3818 to nearest 10…" and "HCF of 110 and
-   121 =" as "HCF of 110 and 12…". Both are valid *different* questions, so the
-   player answered what they could see and was marked wrong for it.
-
-   Measure instead. Try each bucket largest-first and keep the first that fits;
-   `xlong` wraps rather than clipping, so it is a safe floor, and the final loop
-   shaves a point at a time if even that overflows its two-line cap. Costs a
-   couple of forced reflows per question — between questions, never mid-typing. */
-const QUESTION_SIZES = ["question", "question long", "question xlong"];
-const MIN_QUESTION_PX = 11;
-
-/**
- * Is any of the prompt actually being cut off?
- *
- * Deliberately NOT `scrollHeight > clientHeight`. Both are rounded to whole
- * pixels while line-height here is fractional (14.95px, 22.275px…), so that
- * comparison reports 1-3px of phantom overflow on text that is plainly intact —
- * which shaved every prompt down to the 11px floor. Width is the real risk in
- * the nowrap buckets; height only matters where a max-height cap exists, and
- * there it is compared against the cap itself with a pixel of slack.
- */
-function questionClipped(el) {
-  if (el.scrollWidth > el.clientWidth + 1) return true;
-  const cap = parseFloat(getComputedStyle(el).maxHeight);   // NaN when "none"
-  return cap ? el.scrollHeight > cap + 1 : false;
-}
-
-function fitQuestion(el, text) {
-  el.style.fontSize = "";              // drop any shave from the previous question
-  el.textContent = text;
-  for (const cls of QUESTION_SIZES) {
-    el.className = cls;
-    if (!questionClipped(el)) return;
-  }
-  // Nothing fit even at the smallest bucket: shave a point at a time. The floor
-  // stops a pathological prompt from shrinking into illegibility — better to
-  // show slightly clipped text than 4px type, and the self-test flags it.
-  let px = parseFloat(getComputedStyle(el).fontSize);
-  while (questionClipped(el) && px > MIN_QUESTION_PX) {
-    px -= 1;
-    el.style.fontSize = px + "px";
-  }
-}
-
 function askQuestion() {
   const q = drawQuestion(race.src);
   race.current = q;
   race.typed = "";
-  // Figure first: it shares the strip's row, so sizing the text before the
-  // figure lands would measure against a width that is about to change.
+  const qt = $("questionText");
+  qt.textContent = q.prompt;
+  qt.className = "question" + (q.prompt.length > 26 ? " xlong" : q.prompt.length > 15 ? " long" : "");
   if (race.hasFigures) $("figureSlot").innerHTML = q.figure || "";
-  fitQuestion($("questionText"), q.prompt);
   drawAnswer();
 }
 
@@ -1692,10 +1458,7 @@ function renderLanes() {
 
 /** Called only when a score actually changes — not every frame. */
 function updateLanes() {
-  // highs are stored as correct answers; the lanes are drawn in points, so
-  // scale the PB into lane units before comparing it with a live score.
-  const best = race.mode === "level"
-    ? (state.highs[race.level] || 0) * (race.doubled ? 2 : 1) : 0;
+  const best = race.mode === "level" ? (state.highs[race.level] || 0) : 0;
   const leader = Math.max(1, best, ...race.players.map(p => p.score));
   race.players.forEach((p, i) => {
     const w = 4 + (p.score / leader) * 80;
@@ -1839,7 +1602,6 @@ window.addEventListener("keydown", e => {
 function quitRace() {
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
-  clearCountdowns();
   // A practice run with no timer and no question limit can ONLY end by
   // quitting, so treat that as finishing — otherwise the whole session
   // (score, accuracy, review list, stats) is silently discarded.
@@ -1883,13 +1645,10 @@ function endRace() {
   const badges = [];
 
   if (race.mode === "level") {
-    // Record CORRECT ANSWERS, not points. v2 stored the raw score, which on the
-    // challenge level is doubled — so once the star moved on, that level's own
-    // best could never be beaten again and its PB marker sat out of reach.
     const prev = state.highs[race.level] || 0;
-    if (race.correct > prev) {
-      state.highs[race.level] = race.correct;
-      badges.push(`<div class="badge">★ ${prev ? `New best — beat ${prev} correct` : "First score on this level"}</div>`);
+    if (score > prev) {
+      state.highs[race.level] = score;
+      badges.push(`<div class="badge">★ ${prev ? `New best — beat ${prev}` : "First score on this level"}</div>`);
     }
     const prevSpd = state.speeds[race.level] || 0;
     if (spd > 0 && (prevSpd === 0 || spd < prevSpd)) {
@@ -1913,6 +1672,7 @@ function endRace() {
     : (race.doubled ? "points (doubled — challenge level)" : "points");
   $("finalBadges").innerHTML = badges.join(" ");
 
+  const prevSpd = race.mode === "level" ? (state.speeds[race.level] || 0) : 0;
   $("finalStats").innerHTML = `
     <div class="stat"><b>${acc}%</b><span>Accuracy</span></div>
     <div class="stat"><b>${spd || "—"}${spd ? "s" : ""}</b><span>Per answer</span></div>
@@ -1977,25 +1737,4 @@ window.addEventListener("resize", () => {
   refreshToggles();
   if (currentScreen === "race" && race) renderInputArea();
 });
-
-/* Load with #selftest to run the suite on boot and see the verdict on the page.
-   The render checks measure the live viewport, so this is the way to test the
-   layout on an actual phone rather than a desktop console. Tap to dismiss. */
-if (location.hash === "#selftest") {
-  const r = window.__selftest();
-  const banner = document.createElement("div");
-  banner.style.cssText =
-    "position:fixed;left:0;right:0;bottom:0;z-index:99;padding:12px 14px;" +
-    "max-height:45vh;overflow:auto;white-space:pre-wrap;color:#fff;" +
-    "font-family:inherit;font-size:13px;font-weight:700;line-height:1.5;" +
-    "background:" + (r.ok ? "#3c8a12" : "#b3271d");
-  banner.textContent = r.ok
-    ? `SELFTEST OK · ${LEVELS.length} levels · ${Object.keys(TOPICS).length} topics · `
-      + `render checks passed at ${window.innerWidth}×${window.innerHeight}\n(tap to dismiss)`
-    : `SELFTEST FAILED · ${r.problems.length} problem(s) at ${window.innerWidth}×${window.innerHeight}\n\n`
-      + r.problems.slice(0, 20).join("\n")
-      + (r.problems.length > 20 ? `\n… and ${r.problems.length - 20} more` : "");
-  banner.addEventListener("click", () => banner.remove());
-  document.body.appendChild(banner);
-}
 </script>
